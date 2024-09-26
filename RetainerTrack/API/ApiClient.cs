@@ -47,7 +47,7 @@ namespace RetainerTrackExpanded.API
                 var request = new RestRequest($"server").AddHeader("api-key", $"{Token}");
                 var response = await _restClient.ExecuteGetAsync(request).ConfigureAwait(false);
                 long pingValue = -1;
-                PersistenceContext._logger.LogCritical($"{_restClient.Options.BaseUrl} --- {_restClient.Options.BaseHost}");
+                
                 using (Ping pp = new Ping())
                 {
                     Uri uri = new Uri($"{Config.BaseUrl}");

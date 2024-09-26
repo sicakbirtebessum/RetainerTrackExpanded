@@ -116,7 +116,7 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         if (command == "/rt")
         {
             MainWindow.IsOpen = true;
-            DetailsWindow.IsOpen = true;
+            //DetailsWindow.IsOpen = true;
         }
     }
 

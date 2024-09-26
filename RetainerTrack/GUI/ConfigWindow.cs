@@ -677,6 +677,7 @@ namespace RetainerTrackExpanded.GUI
 
                         IsSyncingRetainers = false;
                         _LastCursor = 0;
+                        IsDbRefreshing = true;
                         SyncWithLocalDB();
                     }
                 }
@@ -694,11 +695,10 @@ namespace RetainerTrackExpanded.GUI
             return true;
         }
 
-        bool IsDbRefreshing;
+        public bool IsDbRefreshing;
         string UpdatingLocalDbStatus;
         private void SyncWithLocalDB()
         {
-            IsDbRefreshing = true;
             UpdatingLocalDbStatus = "Updating Players";
             using (var scope = PersistenceContext._serviceProvider.CreateScope())
             {

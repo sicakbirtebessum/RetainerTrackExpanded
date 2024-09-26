@@ -389,6 +389,9 @@ internal sealed class PersistenceContext
             using var scope = _serviceProvider.CreateScope();
             using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();
 
+            if (!ConfigWindow.Instance.IsDbRefreshing)
+                return;
+
             foreach (var retainer in updates)
             {
                 Retainer? dbRetainer = dbContext.Retainers.Find(retainer.LocalContentId);
@@ -444,6 +447,9 @@ internal sealed class PersistenceContext
                 if (mapping.PlayerName == cachedPlayer.Name && mapping.AccountId == cachedPlayer.AccountId)
                     return;
             }
+
+            if (!ConfigWindow.Instance.IsDbRefreshing)
+                return;
 
             using (var scope = _serviceProvider.CreateScope())
             {
@@ -518,6 +524,9 @@ internal sealed class PersistenceContext
         
         try
         {
+            if (!ConfigWindow.Instance.IsDbRefreshing)
+                return;
+
             using (var scope = _serviceProvider.CreateScope())
             {
                 using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();

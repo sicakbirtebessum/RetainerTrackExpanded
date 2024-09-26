@@ -248,7 +248,7 @@ namespace RetainerTrackExpanded.GUI
                     {
                         if (selectedComboItem_NameorId == 0)
                         {
-                            bool regex = Regex.IsMatch(_searchContent, @"^[A-Za-z]+([ '-][A-Za-z]+)?$");
+                            bool regex = Regex.IsMatch(_searchContent, @"^[A-Za-z]+(?:[ '-][A-Za-z]+)*[ '-]?$");
                             if (!regex)
                             {
                                 SetPlayerResult((_LastPlayerSearchResult.Players, "Error: Bad search query"));
@@ -418,7 +418,7 @@ namespace RetainerTrackExpanded.GUI
                         {
                             if (ImGui.Button("c" + $"###{index}"))
                             {
-                                ImGui.SetClipboardText(player.AccountId.ToString());
+                                ImGui.SetClipboardText(player.AccountId?.ToString());
                             }
                             ImGui.SameLine();
                         }
