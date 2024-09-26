@@ -1,0 +1,15 @@
+{
+  "Name": "RetainerTrack Expanded",
+  "Author": "SicakBirTebessum, Liza Carvelli",
+  "Punchline": "Track players and retainers. (Crowdsourced)",
+  "Description": "Keeps track of players and who a retainer belongs to. Alt characters can also be tracked (if they have been seen before).",
+  "AssemblyVersion": "1.0",
+  "InternalName": "RetainerTrackExpanded",
+  "RepoUrl": "https://github.com/sicakbirtebessum/RetainerTrackExpanded",
+  "IconUrl": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/raw/main/RetainerTrack.png",
+  "DownloadLinkInstall": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/raw/master/RetainerTrack/latest.zip",
+  "DownloadLinkUpdate": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/raw/master/RetainerTrack/latest.zip",
+  "DalamudApiLevel": 10,
+  "LastUpdate": 1727147899,
+  "Tags": [ "player", "retainer", "track", "account" ]
+}
