@@ -7,7 +7,6 @@
     </PropertyGroup>
     <ItemGroup>
       <Content Include="icon.png" />
-      <Content Include="repo.json" />
     </ItemGroup>
     
     <ItemGroup>
