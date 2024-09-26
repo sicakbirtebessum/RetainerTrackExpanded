@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Network.Structures;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -10,8 +11,10 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using ImGuiNET;
 using Lumina;
+using Messenger.FriendListManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -50,7 +53,7 @@ namespace RetainerTrackExpanded.GUI
             }
             this.SizeConstraints = new WindowSizeConstraints
             {
-                MinimumSize = new Vector2(700, 450),
+                MinimumSize = new Vector2(550, 450),
                 MaximumSize = new Vector2(9999, 9999)
             };
         }
@@ -238,7 +241,7 @@ namespace RetainerTrackExpanded.GUI
                     }
                 }
 
-                if (ImGui.CollapsingHeader("See your contributions ♥"))
+                if (ImGui.CollapsingHeader("See your contributions ♥", ImGuiTreeNodeFlags.DefaultOpen))
                 {
                     Util.DrawHelp(false,"The total number of players you sent to the server\nwho were not previously in the database.");
 
@@ -489,7 +492,7 @@ namespace RetainerTrackExpanded.GUI
             long _refreshButtonCondition = _client._LastServerStats.ServerStats != null ? _client._LastServerStats.ServerStats.LastUpdate : 0;
             using (ImRaii.Disabled(bIsNetworkProcessing || Tools.UnixTime - _refreshButtonCondition < 20))
             {
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.SyncAlt, "Refresh Stats"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.SyncAlt, "Refresh Server Stats"))
                 {
                     CheckServerStats();
                 }
@@ -504,13 +507,29 @@ namespace RetainerTrackExpanded.GUI
 
             ImGui.Text("Player Count:"); ImGui.SameLine();
             if (_client._LastServerStats.ServerStats != null)
+            {
                 ImGui.TextColored(ImGuiColors.HealerGreen, $"{_client._LastServerStats.ServerStats.TotalPlayerCount.ToString()}");
+
+                if (_client._LastServerStats.ServerStats.TotalPrivatePlayerCount > 0)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(ImGuiColors.DalamudGrey, $" (+{_client._LastServerStats.ServerStats.TotalPrivatePlayerCount} private players)");
+                }
+            }
             else
                 ImGui.TextColored(ImGuiColors.DalamudRed, "...");
 
             ImGui.Text("Retainer Count:"); ImGui.SameLine();
             if (_client._LastServerStats.ServerStats != null)
+            {
                 ImGui.TextColored(ImGuiColors.HealerGreen, $"{_client._LastServerStats.ServerStats.TotalRetainerCount.ToString()}");
+
+                if (_client._LastServerStats.ServerStats.TotalPrivateRetainerCount > 0)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(ImGuiColors.DalamudGrey, $" (+{_client._LastServerStats.ServerStats.TotalPrivateRetainerCount} private retainers)");
+                }
+            }
             else
                 ImGui.TextColored(ImGuiColors.DalamudRed, "...");
 
@@ -555,21 +574,21 @@ namespace RetainerTrackExpanded.GUI
                 }
 
                 Util.CompletionProgressBar(_playersFetchedFromServer.Count + _retainersFetchedFromServer.Count,
-                    _client._LastServerStats.ServerStats.TotalPlayerCount + _client._LastServerStats.ServerStats.TotalRetainerCount);
+                    (_client._LastServerStats.ServerStats.TotalPlayerCount - _client._LastServerStats.ServerStats.TotalPrivatePlayerCount)
+                    + (_client._LastServerStats.ServerStats.TotalRetainerCount - _client._LastServerStats.ServerStats.TotalPrivateRetainerCount));
             }
                 
-
             Util.ShowColoredMessage(_SyncMessage);
 
-            if (IsDbRefreshing)
-            {
-                ImGui.NewLine();
-                Util.ShowColoredMessage("Updating Local Database, please wait...");
+            //if (IsDbRefreshing)
+            //{
+            //    ImGui.NewLine();
+            //    Util.ShowColoredMessage("Updating Local Database, please wait...");
 
-                ImGui.SameLine();
+            //    ImGui.SameLine();
 
-                using (ImRaii.Disabled()) { ImGuiComponents.IconButtonWithText(HourGlass().Icon, $"{UpdatingLocalDbStatus}{HourGlass().Text}"); }
-            }
+            //    using (ImRaii.Disabled()) { ImGuiComponents.IconButtonWithText(HourGlass().Icon, $"{UpdatingLocalDbStatus}{HourGlass().Text}"); }
+            //}
         }
 
         private CancellationTokenSource _cancellationToken;
@@ -586,11 +605,6 @@ namespace RetainerTrackExpanded.GUI
                 return (FontAwesomeIcon.HourglassHalf, "...");
             }
         }
-
-        System.Threading.Timer timer;
-
-        FontAwesomeIcon _hourGlassState = FontAwesomeIcon.HourglassStart;
-
 
         bool IsSyncingPlayers;
         bool IsSyncingRetainers;
@@ -617,8 +631,8 @@ namespace RetainerTrackExpanded.GUI
                     _LastCursor = request.Page.Cursor;
                     if (request.Page.NextCount > 0)
                     {
-                        _SyncMessage = $"Fetching Players... ({_playersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalPlayerCount})";
-                        Thread.Sleep(10);
+                        _SyncMessage = $"Fetching Players... ({_playersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalPlayerCount - _client._LastServerStats.ServerStats.TotalPrivatePlayerCount})";
+                        Thread.Sleep(300);
                         goto syncplayer;
                     }
                     else
@@ -661,19 +675,22 @@ namespace RetainerTrackExpanded.GUI
                     _LastCursor = request.Page.Cursor;
                     if (request.Page.NextCount > 0)
                     {
-                        _SyncMessage = $"Fetching Retainers... ({_retainersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalRetainerCount})";
-                        Thread.Sleep(10);
+                        _SyncMessage = $"Fetching Retainers... ({_retainersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalRetainerCount - _client._LastServerStats.ServerStats.TotalPrivateRetainerCount})";
+                        Thread.Sleep(300);
                         goto syncretainer;
                     }
                     else
                     {
-                        if (_playersFetchedFromServer.Count > _client._LastServerStats.ServerStats.TotalPlayerCount)
-                            _client._LastServerStats.ServerStats.TotalPlayerCount = _playersFetchedFromServer.Count;
-                        if (_retainersFetchedFromServer.Count > _client._LastServerStats.ServerStats.TotalRetainerCount)
-                            _client._LastServerStats.ServerStats.TotalRetainerCount = _retainersFetchedFromServer.Count;
+                        int _serverPlayerCount = _client._LastServerStats.ServerStats.TotalPlayerCount - _client._LastServerStats.ServerStats.TotalPrivatePlayerCount;
+                        int _serverRetainerCount = _client._LastServerStats.ServerStats.TotalRetainerCount - _client._LastServerStats.ServerStats.TotalPrivateRetainerCount;
 
-                        _SyncMessage = $"Fetching Complete.\nPlayers: ({_playersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalPlayerCount})" +
-                                        $" - Retainers ({_retainersFetchedFromServer.Count}/{_client._LastServerStats.ServerStats.TotalRetainerCount})";
+                        if (_playersFetchedFromServer.Count > _serverPlayerCount)
+                            _serverPlayerCount = _playersFetchedFromServer.Count;
+                        if (_retainersFetchedFromServer.Count > _serverRetainerCount)
+                            _serverRetainerCount = _retainersFetchedFromServer.Count;
+
+                        _SyncMessage = $"Fetching Complete.\nPlayers: ({_playersFetchedFromServer.Count}/{_serverPlayerCount})" +
+                                        $" - Retainers ({_retainersFetchedFromServer.Count}/{_serverRetainerCount})";
 
                         IsSyncingRetainers = false;
                         _LastCursor = 0;
@@ -696,60 +713,28 @@ namespace RetainerTrackExpanded.GUI
         }
 
         public bool IsDbRefreshing;
-        string UpdatingLocalDbStatus;
         private void SyncWithLocalDB()
         {
-            UpdatingLocalDbStatus = "Updating Players";
-            using (var scope = PersistenceContext._serviceProvider.CreateScope())
+            var playerMappings = _playersFetchedFromServer.Select(p => new PlayerMapping {
+                ContentId = (ulong)p.Key,
+                PlayerName = p.Value.Name,
+                AccountId = p.Value.AccountId != null ? (ulong)p.Value.AccountId : null,
+            }).ToList();
+
+            var retainerMappings = _retainersFetchedFromServer.Select(r => new Retainer
             {
-                using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();
-                foreach (var update in _playersFetchedFromServer)
-                {
-                    var dbPlayer = dbContext.Players.Find((ulong)update.Key);
-                    if (dbPlayer == null)
-                    {
-                        dbContext.Players.Add(new Player
-                        {
-                            LocalContentId = (ulong)update.Key,
-                            Name = update.Value.Name,
-                            AccountId = update.Value.AccountId != null ? (ulong)update.Value.AccountId : null,
-                        });
-                    }
-                    else
-                    {
-                        dbPlayer.Name = update.Value.Name;
-                        dbPlayer.AccountId ??= (ulong?)update.Value.AccountId;
-                        dbContext.Entry(dbPlayer).State = EntityState.Modified;
-                    }
-                }
+                LocalContentId = (ulong)r.Key,
+                Name = r.Value.Name,
+                OwnerLocalContentId = (ulong)r.Value.OwnerLocalContentId,
+                WorldId = r.Value.WorldId,
+            }).ToList();
 
-                UpdatingLocalDbStatus = "Updating Retainers";
-                foreach (var retainer in _retainersFetchedFromServer)
-                {
-                    Retainer? dbRetainer = dbContext.Retainers.Find((ulong)retainer.Key);
-                    if (dbRetainer == null)
-                    {
-                        dbContext.Retainers.Add(new Retainer
-                        {
-                            LocalContentId = (ulong)retainer.Key,
-                            Name = retainer.Value.Name,
-                            OwnerLocalContentId = (ulong)retainer.Value.OwnerLocalContentId,
-                            WorldId = retainer.Value.WorldId
-                        });
-                    }
-                    else
-                    {
-                        dbRetainer.Name = retainer.Value.Name;
-                        dbRetainer.WorldId = retainer.Value.WorldId;
-                        dbRetainer.OwnerLocalContentId = (ulong)retainer.Value.OwnerLocalContentId;
-                        dbContext.Retainers.Update(dbRetainer);
-                    }
-                }
+            _ = Task.Run(() =>
+            {
+                PersistenceContext.Instance.HandleContentIdMappingAsync(playerMappings);
+                PersistenceContext.Instance.HandleMarketBoardPage(retainerMappings);
+            });
 
-                int changeCount = dbContext.SaveChanges();
-            }
-
-            PersistenceContext.ReloadCache();
             MainWindow.ReloadMainWindowStats();
 
             _playersFetchedFromServer.Clear(); _retainersFetchedFromServer.Clear();
@@ -776,6 +761,7 @@ namespace RetainerTrackExpanded.GUI
                 _ = Task.Run(() =>
                 {
                     bIsNetworkProcessing = true;
+                   // _client._LastServerStats.ServerStats = null;
 
                     var request = _client.CheckServerStats().ConfigureAwait(false).GetAwaiter().GetResult();
                     _LastServerStatsMessage = request.Message;

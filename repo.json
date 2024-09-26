@@ -4,14 +4,15 @@
     "Author": "SicakBirTebessum, Liza Carvelli",
     "Punchline": "Track players and retainers. (Crowdsourced)",
     "Description": "Keeps track of players and who a retainer belongs to. Alt characters can also be tracked if they have been seen before. --Currently only for whitelisted players.",
-    "AssemblyVersion": "1.0.1",
+    "AssemblyVersion": "1.0.2",
     "InternalName": "RetainerTrackExpanded",
     "RepoUrl": "https://github.com/sicakbirtebessum/RetainerTrackExpanded",
     "IconUrl": "https://raw.githubusercontent.com/sicakbirtebessum/RetainerTrackExpanded/master/icon.png",
-    "DownloadLinkInstall": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/releases/download/1.0.1/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/releases/download/1.0.1/latest.zip",
+    "DownloadLinkInstall": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/releases/download/1.0.2/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/sicakbirtebessum/RetainerTrackExpanded/releases/download/1.0.2/latest.zip",
     "DalamudApiLevel": 10,
-    "LastUpdate": 1727345689,
+    "LastUpdate": 1727541937,
+	"Changelog": "- Added context menu. You can now easily search for other players by right-clicking in various menus. (E.g. friends list, party list, player search, linkshells, party finder lists, blacklisted players, and many other areas)\n- UI has been improved. Unnecessary elements have been removed, and the interface has been simplified.\n- Fixed the issue with syncing the server and local database.\n- Fixed the issue where Retainer owners' names were not displayed when viewing items on the marketboard.",
     "Tags": [ "player", "retainer", "track", "account", "rtrack" ]
   }
 ]

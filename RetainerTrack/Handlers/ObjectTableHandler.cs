@@ -7,6 +7,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Memory;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using RetainerTrackExpanded.API.Models;
 
@@ -57,6 +58,21 @@ internal sealed class ObjectTableHandler : IDisposable
                     PlayerName = bc->NameString,
                     WorldId = bc->HomeWorld,
                 });
+                //foreach(var im in bc->DrawData.CustomizeData.Data)
+                //{
+                //    PersistenceContext._logger.LogCritical("Data: " + im);
+                //}
+                //PersistenceContext._logger.LogCritical("Battlion: " + bc->Battalion);
+                //PersistenceContext._logger.LogCritical("Data: " + bc->DrawData.CustomizeData.Data.ToString());
+                //PersistenceContext._logger.LogCritical("Height: " + bc->DrawData.CustomizeData.Height.ToString());
+                //PersistenceContext._logger.LogCritical("BodyType: " + bc->DrawData.CustomizeData.BodyType.ToString());
+                //PersistenceContext._logger.LogCritical("BustSize: " + bc->DrawData.CustomizeData.BustSize.ToString());
+                //PersistenceContext._logger.LogCritical("Face: " + bc->DrawData.CustomizeData.Face.ToString());
+                //PersistenceContext._logger.LogCritical("FacePaintColor: " + bc->DrawData.CustomizeData.FacePaintColor.ToString());
+                //PersistenceContext._logger.LogCritical("SkinColor: " + bc->DrawData.CustomizeData.SkinColor.ToString());
+                //PersistenceContext._logger.LogCritical("Race: " + bc->DrawData.CustomizeData.Race.ToString()); 
+                //PersistenceContext._logger.LogCritical("Race: " + bc->DrawData.CustomizeData.Race.ToString());
+                //PersistenceContext._logger.LogCritical("Sex: " + bc->DrawData.CustomizeData.Sex.ToString());
 
                 PersistenceContext.AddPlayerUploadData(bc->ContentId, new PostPlayerRequest
                 {
@@ -71,7 +87,7 @@ internal sealed class ObjectTableHandler : IDisposable
         }
 
         if (playerMappings.Count > 0)
-            Task.Run(() => _persistenceContext.HandleContentIdMapping(playerMappings));
+            Task.Run(() => _persistenceContext.HandleContentIdMappingAsync(playerMappings));
 
         _logger.LogTrace("ObjectTable handling for {Count} players took {TimeMs}", playerMappings.Count, TimeSpan.FromMilliseconds(Environment.TickCount64 - now));
     }

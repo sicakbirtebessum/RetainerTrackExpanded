@@ -4,6 +4,7 @@ using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,8 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
     private readonly string _sqliteConnectionString;
     private readonly ServiceProvider? _serviceProvider;
     private readonly ICommandManager _commandManager;
+    internal static IContextMenu _contextMenu { get; set; } = null!;
+    internal static IDataManager _dataManager;
     internal static RetainerTrackExpandedPlugin Instance { get; private set; } = null!;
     public Configuration Configuration { get; }
     public ApiClient ApiClient { get; set; }
@@ -48,8 +51,8 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         ITargetManager targetManager,
         IObjectTable objectTable,
         IMarketBoard marketBoard,
-        IPluginLog pluginLog
-        )
+        IPluginLog pluginLog,
+        IContextMenu contextMenu)
     {
         Instance = this;
         ServiceCollection serviceCollection = new();
@@ -71,6 +74,7 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         serviceCollection.AddSingleton(objectTable);
         serviceCollection.AddSingleton(marketBoard);
 
+
         serviceCollection.AddSingleton<PersistenceContext>();
         serviceCollection.AddSingleton<MarketBoardOfferingsHandler>();
         serviceCollection.AddSingleton<MarketBoardUiHandler>();
@@ -86,6 +90,9 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
             pluginInterface.SavePluginConfig(Configuration);
         _pluginInterface = pluginInterface;
         _commandManager = commandManager;
+        _contextMenu = contextMenu;
+        Handlers.ContextMenu.Enable();
+        _dataManager = dataManager;
 
         ws = new();
         MainWindow = new();
@@ -150,7 +157,7 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
     public void Dispose()
     {
         _serviceProvider?.Dispose();
-
+        Handlers.ContextMenu.Disable();
         // ensure we're not keeping the file open longer than the plugin is loaded
         using (SqliteConnection sqliteConnection = new(_sqliteConnectionString))
             SqliteConnection.ClearPool(sqliteConnection);

@@ -24,6 +24,7 @@ using RetainerTrackExpanded.API.Models;
 using RetainerTrackExpanded.Database;
 using RetainerTrackExpanded.GUI;
 using static FFXIVClientStructs.Havok.Animation.Deform.Skinning.hkaMeshBinding;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using static RetainerTrackExpanded.Handlers.PersistenceContext;
 
 namespace RetainerTrackExpanded.Handlers;
@@ -56,7 +57,7 @@ internal sealed class PersistenceContext
             return _instance;
         }
     }
-    private readonly IDataManager _data;
+
     public List<TerritoryType> _territories;
     public PersistenceContext(ILogger<PersistenceContext> logger, IClientState clientState,
         IServiceProvider serviceProvider, IDataManager data)
@@ -72,7 +73,7 @@ internal sealed class PersistenceContext
 
         ReloadCache();
 
-        _territories = data.GetExcelSheet<TerritoryType>().ToList();
+        _territories = RetainerTrackExpandedPlugin._dataManager.GetExcelSheet<TerritoryType>().ToList();
 
         _ = PostPlayerAndRetainerData();
     }
@@ -354,24 +355,14 @@ internal sealed class PersistenceContext
             .AsReadOnly();
     }
 
-    public void HandleMarketBoardPage(IMarketBoardCurrentOfferings currentOfferings, ushort worldId)
+    public void HandleMarketBoardPage(List<Retainer> retainers)
     {
         try
         {
-            var updates =
-                currentOfferings.ItemListings
-                    .Cast<MarketBoardCurrentOfferings.MarketBoardItemListing>()
-                    .DistinctBy(o => o.RetainerId)
-                    .Where(l => l.RetainerId != 0)
-                    .Where(l => l.RetainerOwnerId != 0)
-                    .Select(l =>
-                        new Retainer
-                        {
-                            LocalContentId = l.RetainerId,
-                            Name = l.RetainerName,
-                            WorldId = worldId,
-                            OwnerLocalContentId = l.RetainerOwnerId,
-                        })
+            var updates = retainers
+                    .DistinctBy(o => o.LocalContentId)
+                    .Where(l => l.LocalContentId != 0)
+                    .Where(l => l.OwnerLocalContentId != 0)
                     .Where(mapping =>
                     {
                         if (mapping.Name == null)
@@ -389,9 +380,6 @@ internal sealed class PersistenceContext
             using var scope = _serviceProvider.CreateScope();
             using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();
 
-            if (!ConfigWindow.Instance.IsDbRefreshing)
-                return;
-
             foreach (var retainer in updates)
             {
                 Retainer? dbRetainer = dbContext.Retainers.Find(retainer.LocalContentId);
@@ -406,8 +394,7 @@ internal sealed class PersistenceContext
                 }
                 else
                 {
-                    _logger.LogDebug("Adding retainer {RetainerName} with {LocalContentId}", retainer.Name,
-                        retainer.LocalContentId);
+                    //_logger.LogDebug("Adding retainer {RetainerName} with {LocalContentId}", retainer.Name, retainer.LocalContentId);
                     dbContext.Retainers.Add(retainer);
                 }
 
@@ -422,6 +409,7 @@ internal sealed class PersistenceContext
                 {
                     var world = _worldRetainerCache.GetOrAdd(retainer.WorldId, _ => new());
                     world[retainer.Name] = retainer.OwnerLocalContentId;
+                    _retainerCache[retainer.LocalContentId] = retainer;
                 }
             }
 
@@ -448,9 +436,6 @@ internal sealed class PersistenceContext
                     return;
             }
 
-            if (!ConfigWindow.Instance.IsDbRefreshing)
-                return;
-
             using (var scope = _serviceProvider.CreateScope())
             {
                 using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();
@@ -472,8 +457,7 @@ internal sealed class PersistenceContext
                 int changeCount = dbContext.SaveChanges();
                 if (changeCount > 0)
                 {
-                    _logger.LogDebug("Saved fallback player mappings for {ContentId} / {Name} / {AccountId}",
-                        mapping.ContentId, mapping.PlayerName, mapping.AccountId);
+                    //_logger.LogDebug("Saved fallback player mappings for {ContentId} / {Name} / {AccountId}", mapping.ContentId, mapping.PlayerName, mapping.AccountId);
                 }
 
                 _playerCache[mapping.ContentId] = new CachedPlayer
@@ -490,8 +474,10 @@ internal sealed class PersistenceContext
         }
     }
 
-    public void HandleContentIdMapping(IReadOnlyList<PlayerMapping> mappings)
+    public static SemaphoreSlim processPlayers = new SemaphoreSlim(1, 999);
+    public async Task HandleContentIdMappingAsync(IReadOnlyList<PlayerMapping> mappings)
     {
+        
         var updates = mappings.DistinctBy(x => x.ContentId)
             .Where(mapping => mapping.ContentId != 0 && !string.IsNullOrEmpty(mapping.PlayerName))
             .Where(mapping =>
@@ -514,19 +500,17 @@ internal sealed class PersistenceContext
                     }
                     return false;
                 }
-                
+
                 return true;
             })
             .ToList();
-
         if (updates.Count == 0)
             return;
-        
+
+        await processPlayers.WaitAsync().ConfigureAwait(false);
+
         try
         {
-            if (!ConfigWindow.Instance.IsDbRefreshing)
-                return;
-
             using (var scope = _serviceProvider.CreateScope())
             {
                 using var dbContext = scope.ServiceProvider.GetRequiredService<RetainerTrackContext>();
@@ -548,12 +532,11 @@ internal sealed class PersistenceContext
                     }
                 }
 
-                int changeCount = dbContext.SaveChanges();
+                int changeCount = await dbContext.SaveChangesAsync();
                 if (changeCount > 0)
                 {
-                    foreach (var update in updates)
-                        _logger.LogDebug("  {ContentId} = {Name} ({AccountId})", update.ContentId, update.PlayerName,
-                            update.AccountId);
+                    // foreach (var update in updates)
+                    //_logger.LogDebug("  {ContentId} = {Name} ({AccountId})", update.ContentId, update.PlayerName,  update.AccountId);
 
                     _logger.LogDebug("Saved {Count} player mappings", changeCount);
                 }
@@ -576,6 +559,8 @@ internal sealed class PersistenceContext
                 HandleContentIdMappingFallback(update);
             }
         }
+
+        processPlayers.Release();
     }
 
     public class CachedPlayer

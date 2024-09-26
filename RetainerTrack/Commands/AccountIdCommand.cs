@@ -43,7 +43,7 @@ namespace RetainerTrackExpanded.Commands
                 var bc = (BattleChara*)character.Address;
                 _chatGui.Print($"{character.Name} has Account Id: {bc->AccountId}, Content Id: {bc->ContentId}");
 
-                _persistenceContext.HandleContentIdMapping([
+                _persistenceContext.HandleContentIdMappingAsync([
                     new PlayerMapping
                     {
                         ContentId = bc->ContentId,

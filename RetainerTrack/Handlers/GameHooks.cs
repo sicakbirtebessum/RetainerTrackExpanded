@@ -78,7 +78,7 @@ internal sealed unsafe class GameHooks : IDisposable
                         WorldId = null,
                         CreatedAt = Tools.UnixTime,
                     });
-                    Task.Run(() => _persistenceContext.HandleContentIdMapping(new List<PlayerMapping> { mapping }));
+                    Task.Run(() => _persistenceContext.HandleContentIdMappingAsync(new List<PlayerMapping> { mapping }));
                 }
             }
             else
@@ -134,7 +134,7 @@ internal sealed unsafe class GameHooks : IDisposable
             }
 
             if (mappings.Count > 0)
-                Task.Run(() => _persistenceContext.HandleContentIdMapping(mappings));
+                Task.Run(() => _persistenceContext.HandleContentIdMappingAsync(mappings));
         }
         catch (Exception e)
         {

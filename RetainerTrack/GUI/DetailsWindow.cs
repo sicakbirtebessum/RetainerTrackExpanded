@@ -271,14 +271,7 @@ namespace RetainerTrackExpanded.GUI
 
                             ImGui.TableNextColumn();
 
-                            if (MainWindow.ChaosServerIdList.Contains(retainer.WorldId)) //This is a Chaos server
-                            {
-                                ImGui.Text($"{((ChaosServerIds)retainer.WorldId)} ({retainer.WorldId})"); // Servername column
-                            }
-                            else if (MainWindow.LightServerIdList.Contains(retainer.WorldId)) //This is a Light server
-                            {
-                                ImGui.Text($"{((LightServerIds)retainer.WorldId)} ({retainer.WorldId})"); // Servername column
-                            }
+                            ImGui.Text($"{Util.GetWorld(retainer.WorldId).Name}"); // Servername column
 
                             ImGui.TableNextColumn();
 
@@ -410,7 +403,7 @@ namespace RetainerTrackExpanded.GUI
                         ImGui.TableNextRow();
                         ImGui.TableNextColumn();
 
-                        ImGui.Text(((EuropeServerIds)world.WorldId).ToString()); //World Name
+                        ImGui.Text(Util.GetWorld((uint)world.WorldId).Name.ToString()); //World Name
 
                         ImGui.TableNextColumn();
 
@@ -463,7 +456,7 @@ namespace RetainerTrackExpanded.GUI
                         ImGui.TableNextColumn();
 
                         if (!string.IsNullOrWhiteSpace(altChar.WorldId.ToString()))
-                            ImGui.Text(((EuropeServerIds)altChar.WorldId).ToString()); //World
+                            ImGui.Text(Util.GetWorld(((uint)altChar.WorldId)).Name.ToString()); //World
                         else
                             ImGui.Text("---");
 
@@ -518,7 +511,7 @@ namespace RetainerTrackExpanded.GUI
 
                             ImGui.TableNextColumn();
 
-                            ImGui.Text(((EuropeServerIds)retainer.Worlds.LastOrDefault().WorldId).ToString()); // World
+                            ImGui.Text(Util.GetWorld((uint)retainer.Worlds.LastOrDefault().WorldId).Name.ToString()); // World
 
                             ImGui.TableNextColumn();
 
@@ -622,7 +615,7 @@ namespace RetainerTrackExpanded.GUI
                                     ImGui.TableNextRow();
                                     ImGui.TableNextColumn();
 
-                                    ImGui.Text(((EuropeServerIds)world.WorldId).ToString()); //World Name
+                                    ImGui.Text(Util.GetWorld((uint)world.WorldId).Name.ToString()); //World Name
 
                                     ImGui.TableNextColumn();
 

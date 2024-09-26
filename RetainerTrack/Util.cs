@@ -3,7 +3,9 @@ using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Common.Lua;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
+using Lumina.Excel.GeneratedSheets;
 using Microsoft.VisualBasic;
+using RetainerTrackExpanded.Handlers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +34,45 @@ namespace RetainerTrackExpanded
                 ImGui.SameLine();
             }
         }
+        public static World GetWorld(uint worldId)
+        {
+            var worldSheet = RetainerTrackExpandedPlugin._dataManager.GetExcelSheet<World>()!;
+            var world = worldSheet.FirstOrDefault(x => x.RowId == worldId);
+            if (world == null)
+            {
+                return worldSheet.First();
+            }
+
+            return world;
+        }
+
+        public static string GetRegionCode(World world)
+        {
+            return world.DataCenter?.Value?.Region switch
+            {
+                1 => "JP",
+                2 => "NA",
+                3 => "EU",
+                4 => "OC",
+                _ => string.Empty,
+            };
+        }
+
+        public static bool IsWorldValid(uint worldId)
+        {
+            return IsWorldValid(GetWorld(worldId));
+        }
+
+        public static bool IsWorldValid(World world)
+        {
+            if (world.Name.RawData.IsEmpty || GetRegionCode(world) == string.Empty)
+            {
+                return false;
+            }
+
+            return char.IsUpper((char)world.Name.RawData[0]);
+        }
+
         public static void TextCopy(Vector4 col, string text)
         {
             ImGui.TextColored(col, text);

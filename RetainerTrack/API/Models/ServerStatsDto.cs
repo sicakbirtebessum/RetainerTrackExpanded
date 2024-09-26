@@ -11,8 +11,12 @@ namespace RetainerTrackExpanded.API.Models
     {
         [JsonProperty("P")]
         public int TotalPlayerCount { get; set; }
+        [JsonProperty("A")]
+        public int TotalPrivatePlayerCount { get; set; }
         [JsonProperty("R")]
         public int TotalRetainerCount { get; set; }
+        [JsonProperty("B")]
+        public int TotalPrivateRetainerCount { get; set; }
         [JsonProperty("U")]
         public int TotalUserCount { get; set; }
         [JsonProperty("L")]

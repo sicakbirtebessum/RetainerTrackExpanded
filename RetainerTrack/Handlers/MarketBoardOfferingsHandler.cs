@@ -70,6 +70,6 @@ internal sealed class MarketBoardOfferingsHandler : IDisposable
             });
         }
 
-        Task.Run(() => _persistenceContext.HandleMarketBoardPage(currentOfferings, worldId));
+        Task.Run(() => _persistenceContext.HandleMarketBoardPage(updates));
     }
 }
