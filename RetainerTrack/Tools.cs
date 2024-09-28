@@ -74,19 +74,16 @@ namespace RetainerTrackExpanded
         {
             return DateTimeOffset.FromUnixTimeSeconds(unixTime).ToLocalTime().DateTime.ToString();
         }
-
+        public static string UnixTimeConverter(int? unixTime)
+        {
+            return DateTimeOffset.FromUnixTimeSeconds((int)unixTime).ToLocalTime().DateTime.ToString();
+        }
         public static string GetTerritoryName(ushort territoryId)
         {
-            var territory = PersistenceContext.Instance._territories.First(row => row.RowId == territoryId);
+            var territory = PersistenceContext.Instance.Territories.First(row => row.RowId == territoryId);
             var territoryName = territory.PlaceName.Value?.Name;
             var territoryRegion = territory.PlaceNameRegion.Value?.Name;
             return $"{territoryName}, {territoryRegion}";
-        }
-
-        public static string HashPassword(string rawPassword)
-        {
-            // Crypt using the Blowfish crypt ("BCrypt") algorithm.
-            return BCrypt.Net.BCrypt.HashPassword(rawPassword);
         }
 
     }

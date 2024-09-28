@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static RetainerTrackExpanded.API.Models.User;
 
 namespace RetainerTrackExpanded.API.Models
 {
     public class UserUpdateDto
     {
-        public bool? IsProfilePrivate { get; set; }
-        public string? DiscordId { get; set; }
+        public List<UserCharacterDto?> Characters { get; set; }
     }
 }

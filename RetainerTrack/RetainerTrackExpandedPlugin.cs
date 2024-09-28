@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RetainerTrackExpanded.API;
-using RetainerTrackExpanded.Commands;
 using RetainerTrackExpanded.Database;
 using RetainerTrackExpanded.GUI;
 using RetainerTrackExpanded.Handlers;
@@ -20,24 +19,23 @@ using System.Net.Http;
 
 namespace RetainerTrackExpanded;
 
-internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
+public sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
 {
     public const string DatabaseFileName = "RetainerTrackExpanded.data.sqlite3";
     private readonly string _sqliteConnectionString;
-    private readonly ServiceProvider? _serviceProvider;
+    public static ServiceProvider? _serviceProvider;
     private readonly ICommandManager _commandManager;
     internal static IContextMenu _contextMenu { get; set; } = null!;
-    internal static IDataManager _dataManager;
+    internal static IDataManager _dataManager { get; set; } = null!;
+    internal static IGameGui _gameGui { get; set; } = null!;
     internal static RetainerTrackExpandedPlugin Instance { get; private set; } = null!;
     public Configuration Configuration { get; }
     public ApiClient ApiClient { get; set; }
-
     public GUI.ConfigWindow ConfigWindow;
     public GUI.MainWindow MainWindow;
     public GUI.DetailsWindow DetailsWindow;
     internal WindowSystem ws;
     internal IDalamudPluginInterface _pluginInterface {  get; }
-
     public RetainerTrackExpandedPlugin(
         IDalamudPluginInterface pluginInterface,
         IFramework framework,
@@ -74,25 +72,28 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         serviceCollection.AddSingleton(objectTable);
         serviceCollection.AddSingleton(marketBoard);
 
-
         serviceCollection.AddSingleton<PersistenceContext>();
         serviceCollection.AddSingleton<MarketBoardOfferingsHandler>();
         serviceCollection.AddSingleton<MarketBoardUiHandler>();
         serviceCollection.AddSingleton<ObjectTableHandler>();
         serviceCollection.AddSingleton<GameHooks>();
-        serviceCollection.AddSingleton<AccountIdCommand>();
-        serviceCollection.AddSingleton<WhoCommand>();
-        serviceCollection.AddSingleton<AccountBelongToCommand>();
 
         Configuration = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        ApiClient = new ApiClient();
-        if (Configuration.FreshInstall)
+        //pluginInterface.SavePluginConfig(Configuration);
+        if (Configuration.FreshInstall && string.IsNullOrWhiteSpace(Configuration.Key))
+        {
+            Configuration.FreshInstall = false; Configuration.Key = Util.GenerateRandomKey();
             pluginInterface.SavePluginConfig(Configuration);
+        }
+
+        ApiClient = new ApiClient();
+
         _pluginInterface = pluginInterface;
         _commandManager = commandManager;
         _contextMenu = contextMenu;
         Handlers.ContextMenu.Enable();
         _dataManager = dataManager;
+        _gameGui = gameGui;
 
         ws = new();
         MainWindow = new();
@@ -123,7 +124,6 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         if (command == "/rt")
         {
             MainWindow.IsOpen = true;
-            //DetailsWindow.IsOpen = true;
         }
     }
 
@@ -149,9 +149,6 @@ internal sealed class RetainerTrackExpandedPlugin : IDalamudPlugin
         serviceProvider.GetRequiredService<MarketBoardUiHandler>();
         serviceProvider.GetRequiredService<ObjectTableHandler>();
         serviceProvider.GetRequiredService<GameHooks>();
-        serviceProvider.GetRequiredService<AccountIdCommand>();
-        serviceProvider.GetRequiredService<WhoCommand>();
-        serviceProvider.GetRequiredService<AccountBelongToCommand>();
     }
 
     public void Dispose()

@@ -1,5 +1,6 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -11,13 +12,14 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using ImGuiNET;
 using Lumina;
-using Messenger.FriendListManager;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 using RestSharp;
 using RetainerTrackExpanded.API;
 using RetainerTrackExpanded.API.Models;
@@ -37,13 +39,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CharacterBase.Delegates;
+using static FFXIVClientStructs.FFXIV.Client.UI.AddonJobHudMNK1.ChakraGauge;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
 using static Lumina.Data.Parsing.Layer.LayerCommon;
+using static RetainerTrackExpanded.API.Models.User;
+using static RetainerTrackExpanded.Configuration;
 using static RetainerTrackExpanded.GUI.MainWindow;
 
 namespace RetainerTrackExpanded.GUI
 {
-    internal class ConfigWindow : Window, IDisposable
+    public class ConfigWindow : Window, IDisposable
     {
         public ConfigWindow() : base("Retainer Track Config", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
         {
@@ -57,10 +62,7 @@ namespace RetainerTrackExpanded.GUI
                 MaximumSize = new Vector2(9999, 9999)
             };
         }
-        private readonly string[] FavoritedPlayersColumn = new string[]
-       {
-        "Current Name","Content Id","Account Id","Remove"
-       };
+        
         public readonly IServiceProvider _serviceProvider;
         private static ConfigWindow _instance = null;
         public static ConfigWindow Instance
@@ -78,14 +80,14 @@ namespace RetainerTrackExpanded.GUI
         {
             base.OnOpen();
 
-            bPrivacyStatus = Config.IsProfilePrivate;
-
             IsRefreshed = false;
             IsSaved = false;
             if (string.IsNullOrWhiteSpace(_client._ServerStatus))
             {
                 _client.CheckServerStatus();
             }
+
+            RefreshUserProfileInfo();
         }
 
         public void CheckLocalPlayer()
@@ -110,6 +112,10 @@ namespace RetainerTrackExpanded.GUI
                             _worldId = homeWorld.Id;
                             _accountId = (int)bChar->AccountId;
                             _contentId = (long)bChar->ContentId;
+
+                            Config.ContentId = _contentId;
+                            Config.AccountId = _accountId;
+                            Config.Username = _playerName;
                         }
                     }
                 }
@@ -122,7 +128,6 @@ namespace RetainerTrackExpanded.GUI
         long _contentId = 0;
         int _accountId = 0;
         string _key = string.Empty;
-        string _password = string.Empty;
 
         public Configuration Config = RetainerTrackExpandedPlugin.Instance.Configuration;
         ApiClient _client = ApiClient.Instance;
@@ -131,31 +136,44 @@ namespace RetainerTrackExpanded.GUI
         {
             if (user != null)
             {
-                User _UserResult = user;
+                LastUserInfo = user;
 
-                Config.Username = _UserResult.Name;
-                Config.ContentId = _UserResult.LocalContentId;
-                Config.AccountId = _UserResult.GameAccountId;
-                if (!string.IsNullOrWhiteSpace(_UserResult.Token))
-                    Config.Key = _UserResult.Token;
+                Config.Username = LastUserInfo.Name;
+                Config.ContentId = LastUserInfo.LocalContentId;
+                Config.AccountId = LastUserInfo.GameAccountId;
+                Config.AppRoleId = LastUserInfo.AppRoleId;
+                
+                Config.UploadedPlayersCount = LastUserInfo.NetworkStats?.UploadedPlayersCount;
+                Config.UploadedPlayerInfoCount = LastUserInfo.NetworkStats?.UploadedPlayerInfoCount;
+                Config.UploadedRetainersCount = LastUserInfo.NetworkStats?.UploadedRetainersCount;
+                Config.UploadedRetainerInfoCount = LastUserInfo.NetworkStats?.UploadedRetainerInfoCount;
+                Config.FetchedPlayerInfoCount = LastUserInfo.NetworkStats?.FetchedPlayerInfoCount;
+                Config.SearchedNamesCount = LastUserInfo.NetworkStats?.SearchedNamesCount;
+                Config.LastSyncedTime = LastUserInfo.NetworkStats?.LastSyncedTime;
+  
+                LastUserCharacters = LastUserInfo.Characters;
 
-                Config.AppRoleId = _UserResult.AppRoleId;
-                Config.DiscordId = _UserResult.DiscordId;
-                Config.UploadedPlayersCount = _UserResult.UploadedPlayersCount;
-                Config.UploadedPlayerInfoCount = _UserResult.UploadedPlayerInfoCount;
-                Config.UploadedRetainersCount = _UserResult.UploadedRetainersCount;
-                Config.UploadedRetainerInfoCount = _UserResult.UploadedRetainerInfoCount;
-                Config.LastSyncedTime = _UserResult.LastSyncedTime;
-                Config.IsProfilePrivate = _UserResult.IsProfilePrivate;
-                bPrivacyStatus = _UserResult.IsProfilePrivate;
-                Config.IsLoggedIn = true;
+                if (LastUserInfo.Characters != null && LastUserInfo.Characters.Count > 0)
+                {
+                    foreach (var character in LastUserInfo.Characters)
+                    {
+                        if (character.Privacy == null)
+                        {
+                            character.Privacy = new CharacterPrivacySettingsDto();
+                        }
+                        _LocalUserCharacters[(long)character.LocalContentId] = new UserCharacters { Name = character.Name, Privacy = character.Privacy };
+                    }
+                }
+   
+                Config.LoggedIn = true;
                 Config.FreshInstall = false;
 
                 Config.Save();
             }
         }
 
-        bool bPrivacyStatus;
+        User LastUserInfo { get; set; }
+        List<User.UserCharacterDto?> LastUserCharacters { get; set; }
 
         bool IsRefreshed;
         bool IsSaved;
@@ -170,40 +188,39 @@ namespace RetainerTrackExpanded.GUI
             {
                 if (ImGui.BeginTabItem("User Info"))
                 {
-                    DrawUserInfoPage();
+                    DrawUserInfoTab();
                     ImGui.EndTabItem();
                 }
 
-                using (ImRaii.Disabled(!Config.IsLoggedIn))
+                using (ImRaii.Disabled(!Config.LoggedIn))
                 {
                     if (ImGui.BeginTabItem("Server Stats & Sync Local Database"))
                     {
-                        DrawServerStatsPage();
+                        DrawServerStatsTab();
                         ImGui.EndTabItem();
                     }
                 }
-
-                if (ImGui.BeginTabItem("My Favorites"))
+                using (ImRaii.Disabled(!Config.LoggedIn))
                 {
-                    DrawMyFavoritesPage();
-                    ImGui.EndTabItem();
+                    if (ImGui.BeginTabItem("My Characters & Privacy"))
+                    {
+                        DrawMyCharactersTab();
+                        ImGui.EndTabItem();
+                    }
                 }
                 ImGui.EndTabBar();
             }
         }
-        string? _discordIdField = null;
-        bool bShowDiscordIdTextField = false;
-        private async void DrawUserInfoPage()
+
+        private async void DrawUserInfoTab()
         {
             ServerStatusGui();
 
-            if (!string.IsNullOrWhiteSpace(Config.Key))
+            if (!string.IsNullOrWhiteSpace(Config.Key) && Config.LoggedIn)
             {
                 ImGui.Text("Player Name:");
                 ImGui.SameLine();
                 ImGui.TextColored(ImGuiColors.DalamudYellow, Config.Username);
-
-               // ImGui.SameLine();
 
                 if (Config.AppRoleId < (int)User.Roles.Member)
                 {
@@ -223,22 +240,16 @@ namespace RetainerTrackExpanded.GUI
                 {
                     ImGui.Text("Account Id:");
                     ImGui.SameLine();
-                    //ImGui.TextColored(ImGuiColors.TankBlue, Config.AccountId.ToString());
+                   
                     Util.TextCopy(ImGuiColors.TankBlue, Config.AccountId.ToString());
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Click to copy AccountId");
-                    }
+                    Util.SetHoverTooltip("Click to copy AccountId");
 
                     ImGui.SameLine();
 
                     ImGui.Text("LocalContent Id: ");
                     ImGui.SameLine();
                     Util.TextCopy(ImGuiColors.TankBlue, Config.ContentId.ToString());
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Click to copy LocalContent Id");
-                    }
+                    Util.SetHoverTooltip("Click to copy LocalContent Id");
                 }
 
                 if (ImGui.CollapsingHeader("See your contributions ♥", ImGuiTreeNodeFlags.DefaultOpen))
@@ -250,8 +261,7 @@ namespace RetainerTrackExpanded.GUI
                     ImGui.TextColored(ImGuiColors.TankBlue, Config.UploadedPlayersCount.ToString());
 
                     Util.DrawHelp(true, "The number of player info changes you sent to the server\nwho are already in the database but have different names or worlds");
-                    ImGui.SameLine();
-                    //ImGui.Text("Uploaded Player Info Count:");
+
                     ImGui.SameLine();
                     ImGui.TextColored(ImGuiColors.TankBlue, $"({Config.UploadedPlayerInfoCount.ToString()})");
 
@@ -261,117 +271,32 @@ namespace RetainerTrackExpanded.GUI
                     ImGui.SameLine();
                     ImGui.TextColored(ImGuiColors.TankBlue, Config.UploadedRetainersCount.ToString());
                    
-                    Util.DrawHelp(true, " The total number of retainer info changes (name or world) you sent to the server.");
+                    Util.DrawHelp(true, "The total number of retainer info changes (name or world) you sent to the server.");
                     ImGui.SameLine();
                     ImGui.TextColored(ImGuiColors.TankBlue, $"({Config.UploadedRetainerInfoCount.ToString()})");
+
+                    Util.DrawHelp(false, "The total number of players whose profile details you have viewed.");
+
+                    ImGui.Text("Fetched Player Info Count:");
+                    ImGui.SameLine();
+                    ImGui.TextColored(ImGuiColors.TankBlue, Config.FetchedPlayerInfoCount.ToString());
+
+                    Util.DrawHelp(true, "The total number of player and retainer search count.");
+                    ImGui.SameLine();
+                    ImGui.TextColored(ImGuiColors.TankBlue, $"({Config.SearchedNamesCount.ToString()})");
                 }
 
                 ImGui.NewLine();
 
-                ImGui.Text("Account Privacy:");
-                ImGui.SameLine();
-                ImGui.Checkbox("Is Private", ref bPrivacyStatus);
-
-                if (bPrivacyStatus)
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Sync, "Refresh Profile Info"))
                 {
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("No information related to you will appear in search results." +
-                            "\nNeither your player data nor your retainer information will be shared with other players.");
-                    }
+                    RefreshUserProfileInfo();
                 }
-                else
-                {
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Information related to you will appear in search results." +
-                            "\nYour player data and retainer information can be searched by other players.");
-                    }
-                }
+                Util.SetHoverTooltip("Request profile data from the server");
 
-                Util.DrawHelp(false, "In case you forget your password, you can verify with your Discord ID and reset your password.");
-                ImGui.Text("Discord Id:");
-                ImGui.SameLine();
-                
-                ImGui.SetNextItemWidth(185);
-                if (bShowDiscordIdTextField)
-                {
-                    ImGui.InputTextWithHint("", "eg: 560441026784763904", ref _discordIdField, 19, ImGuiInputTextFlags.CharsNoBlank);
-                }
-                else
-                {
-                    _discordIdField = Config.DiscordId.ToString();
-                    ImGui.TextWrapped(_discordIdField.ToString());
-                }
-
-                ImGui.SameLine();
-
-                var _editingText = !bShowDiscordIdTextField ? "Edit" : "Cancel";
-                var _editingIcon = !bShowDiscordIdTextField ? FontAwesomeIcon.Edit : FontAwesomeIcon.Backspace;
-                
-                if (ImGuiComponents.IconButtonWithText(_editingIcon, _editingText))
-                {
-                    bShowDiscordIdTextField = !bShowDiscordIdTextField;
-                }
-
-                ImGui.Text("\n");
-
-                using (ImRaii.Disabled(bIsNetworkProcessing))
-                {
-                    using (ImRaii.Disabled(bPrivacyStatus == Config.IsProfilePrivate && (_discordIdField == Config.DiscordId.ToString()))) //!bShowDiscordIdTextField && 
-                        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Save, "Save Config"))
-                        {
-                            string? _finalDiscordId = null;
-                            if (bShowDiscordIdTextField && _discordIdField != Config.DiscordId.ToString())
-                            {       
-                                _finalDiscordId = _discordIdField;
-                            }
-
-                            _ = Task.Run(() =>
-                            {
-                                bIsNetworkProcessing = true;
-                                var request = _client.UserUpdate(new UserUpdateDto { IsProfilePrivate = bPrivacyStatus, DiscordId = _finalDiscordId }).ConfigureAwait(false).GetAwaiter().GetResult();
-                                LastNetworkMessage = request.Message;
-                                bIsNetworkProcessing = false;
-                                if (request.User != null)
-                                {
-                                    LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-                                    bShowDiscordIdTextField = false;
-                                    SaveUserResultToConfig(request.User);
-                                }
-                            });
-
-                        }
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Save your configuration to server");
-                    }
-                    ImGui.SameLine();
-
-                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Sync, "Refresh Profile Info"))
-                    {
-                        _ = Task.Run(() =>
-                        {
-                            bIsNetworkProcessing = true;
-                            var request = _client.UserRefreshMyInfo().ConfigureAwait(false).GetAwaiter().GetResult();
-                            LastNetworkMessage = request.Message;
-                            LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-                            bIsNetworkProcessing = false;
-                            if (request.User != null)
-                            {
-                                //LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-                                SaveUserResultToConfig(request.User);
-                            }
-                        });
-                    }
-                    if (ImGui.IsItemHovered())
-                    {
-                        ImGui.SetTooltip("Request profile data from the server");
-                    }
-                }
                 if (!string.IsNullOrWhiteSpace(LastNetworkMessage))
                 {
-                    Util.ColoredTextWrapped($"{LastNetworkMessage} ({LastNetworkMessageTime})");
+                    Util.ColoredErrorTextWrapped($"{LastNetworkMessage} ({LastNetworkMessageTime})");
                 }
             }
             else
@@ -402,82 +327,68 @@ namespace RetainerTrackExpanded.GUI
 
                     ImGui.Text("\n");
 
-                    ImGui.Text("Enter a password (at least 5 characters):");
-                    ImGui.InputTextWithHint("##Pass", "Password", ref _password, 50, ImGuiInputTextFlags.Password);
                     //ImGui.SetNextItemWidth(200);
-                    using (ImRaii.Disabled(bIsNetworkProcessing))
+                    using (ImRaii.Disabled(bIsNetworkProcessing || ClickedLoginButton || _client._ServerStatus != "ONLINE"))
                     {
-                        if (ImGui.Button("Register", new Vector2(100, 30)))
+                        if (ImGui.Button("Login with Discord", new Vector2(150, 30)))
                         {
-                            if (_password.Length < 5)
+                            ClickedLoginButton = true;
+                            _ = Task.Run(() =>
                             {
-                                LastRegistrationWindowMessage = "Error: Password must be at least 5 characters long.";
-                            }
-                            else
-                            {
-                                _ = Task.Run(() =>
+                                bIsNetworkProcessing = true;
+                                var request = _client.DiscordAuth(new UserRegister
                                 {
-                                    bIsNetworkProcessing = true;
-                                    var request = _client.UserRegister(new UserRegister
-                                    {
-                                        GameAccountId = _accountId,
-                                        UserLocalContentId = _contentId,
-                                        Name = _playerName,
-                                        Password = Tools.HashPassword(_password)
-                                    }).ConfigureAwait(false).GetAwaiter().GetResult();
+                                    GameAccountId = _accountId,
+                                    UserLocalContentId = _contentId,
+                                    Name = _playerName,
+                                    ClientId = Config.Key,
+                                    Version = Util.clientVer
+                                }).ConfigureAwait(false).GetAwaiter().GetResult();
 
-                                    LastRegistrationWindowMessage = request.Message;
-                                    bIsNetworkProcessing = false;
-                                    if (request.User != null)
-                                    {
-                                        SaveUserResultToConfig(request.User);
-                                    }
-                                });
-                            }
+                                LastRegistrationWindowMessage = request.Message;
+                                bIsNetworkProcessing = false;
+                            });
                         }
                     }
-
-                    ImGui.SameLine();
-                    ImGui.Text("OR");
-                    ImGui.SameLine();
-
-                    using (ImRaii.Disabled(bIsNetworkProcessing))
+                    if (ClickedLoginButton)
                     {
-                        if (ImGui.Button("Login with Pass", new Vector2(115, 30)))
+                        ImGui.SameLine();
+                        if (ImGui.Button("Continue", new Vector2(120, 30)))
                         {
-                            if (_password.Length < 5)
+                            _ = Task.Run(() =>
                             {
-                                LastRegistrationWindowMessage = "Error: Password must be at least 5 characters long.";
-                            }
-                            else
-                            {
-                                _ = Task.Run(() =>
+                                bIsNetworkProcessing = true;
+                                var request = _client.UserLogin(new UserRegister
                                 {
-                                    bIsNetworkProcessing = true;
-                                    var request = _client.UserLogin(_accountId, _password).ConfigureAwait(false).GetAwaiter().GetResult();
-                                    LastRegistrationWindowMessage = request.Message;
-                                    bIsNetworkProcessing = false;
-                                    if (request.User != null)
-                                    {
-                                        SaveUserResultToConfig(request.User);
-                                    }
-                                });
-                            }
+                                    GameAccountId = _accountId,
+                                    UserLocalContentId = _contentId,
+                                    Name = _playerName,
+                                    ClientId = Config.Key,
+                                    Version = Util.clientVer,
+                                }).ConfigureAwait(false).GetAwaiter().GetResult();
+
+                                LastRegistrationWindowMessage = request.Message;
+                                bIsNetworkProcessing = false;
+                                if (request.User != null)
+                                {
+                                    SaveUserResultToConfig(request.User);
+                                }
+                            });
                         }
                     }
-                    Util.ShowColoredMessage(LastRegistrationWindowMessage);
+                    Util.ColoredErrorTextWrapped(LastRegistrationWindowMessage);
                 }
                 else
                 {
-                    ImGui.TextColored(ImGuiColors.DalamudRed, "You are not logged in.\nPlease login with a character to sign up.");
+                    ImGui.TextColored(ImGuiColors.DalamudRed, "You are not logged in.\nPlease login with a character to continue.");
 
                 }
             }
         }
-
+        bool ClickedLoginButton = false;
         bool IsRefreshStatsRequestSent = false;
         public string _LastServerStatsMessage = string.Empty;
-        private async void DrawServerStatsPage()
+        private async void DrawServerStatsTab()
         {
             ServerStatusGui();
 
@@ -500,7 +411,7 @@ namespace RetainerTrackExpanded.GUI
             if (!string.IsNullOrWhiteSpace(_LastServerStatsMessage))
             {
                 ImGui.SameLine();
-                Util.ColoredTextWrapped(_LastServerStatsMessage);
+                Util.ColoredErrorTextWrapped(_LastServerStatsMessage);
             }
 
             ImGui.NewLine();
@@ -579,16 +490,195 @@ namespace RetainerTrackExpanded.GUI
             }
                 
             Util.ShowColoredMessage(_SyncMessage);
+        }
 
-            //if (IsDbRefreshing)
-            //{
-            //    ImGui.NewLine();
-            //    Util.ShowColoredMessage("Updating Local Database, please wait...");
+        private ConcurrentDictionary<long, UserCharacters> _LocalUserCharacters = new();
+        public class UserCharacters
+        {
+            public string? Name { get; set; }
+            public User.CharacterPrivacySettingsDto? Privacy { get; init; }
+        }
 
-            //    ImGui.SameLine();
+        private List<long?> EditedCharactersPrivacy = new List<long?>();
+        private async void DrawMyCharactersTab()
+        {
+            ImGui.TextWrapped($"You can configure the privacy settings of your characters in this tab.");
 
-            //    using (ImRaii.Disabled()) { ImGuiComponents.IconButtonWithText(HourGlass().Icon, $"{UpdatingLocalDbStatus}{HourGlass().Text}"); }
-            //}
+            ImGui.NewLine();
+
+            ImGui.TextWrapped($"A total of {_LocalUserCharacters.Count} characters of yours were found.");
+
+            ImGuiHelpers.ScaledDummy(5.0f);
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(5.0f);
+
+            ImGui.BeginGroup();
+
+            if (LastUserInfo != null && LastUserInfo.Characters != null && LastUserInfo.Characters.Count > 0 && _LocalUserCharacters.Count > 0)
+            {
+
+                var index = 0;
+                foreach (var character in LastUserInfo.Characters)
+                {
+                    if (ImGui.Button("Load Details" + $"##{index}"))
+                    {
+                        DetailsWindow.Instance.IsOpen = true;
+                        DetailsWindow.Instance.OpenDetailedPlayerWindow((ulong)character.LocalContentId, true);
+                    }
+
+                    ImGui.SameLine();
+                    var charName = character.Name != null || !string.IsNullOrWhiteSpace(character.Name) ? character.Name : "[NAME NOT FOUND]";
+                    var headerText = $"{charName}";
+
+                    int visitCount = character.ProfileVisitInfo != null ? (int)character.ProfileVisitInfo.ProfileTotalVisitCount : 0;
+                    if (visitCount > 0)
+                    {
+                        headerText += $" | Total Visit Count: {visitCount}";
+                    }
+
+                    if (ImGui.CollapsingHeader($"{headerText}"))
+                    {
+                        if (visitCount > 0)
+                        {
+                            var lastVisitDateString = $"{Tools.UnixTimeConverter(character.ProfileVisitInfo.LastProfileVisitDate)} ({Tools.ToTimeSinceString((int)character.ProfileVisitInfo.LastProfileVisitDate)})";
+                            Util.ColoredTextWrapped(ImGuiColors.ParsedBlue, "Someone visited your profile on: " + lastVisitDateString);
+                        }
+                        if (character.Privacy != null)
+                        {
+                            _LocalUserCharacters.TryGetValue((long)character.LocalContentId, out var _getLocalChara);
+
+                            bool _bHideFullProfile = _getLocalChara.Privacy.HideFullProfile;
+                            bool _bHideTerritoryInfo = _getLocalChara.Privacy.HideTerritoryInfo;
+                            bool _bHideCustomizations = _getLocalChara.Privacy.HideCustomizations;
+                            bool _bHideInSearchResults = _getLocalChara.Privacy.HideInSearchResults;
+                            bool _bHideRetainersInfo = _getLocalChara.Privacy.HideRetainersInfo;
+                            bool _bHideAltCharacters = _getLocalChara.Privacy.HideAltCharacters;
+
+                            if (ImGui.Checkbox("Hide Full Profile" + $"##{index}", ref _bHideFullProfile))
+                            {
+                                _getLocalChara.Privacy.HideFullProfile = _bHideFullProfile;
+                                if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);
+                            }
+                            Util.SetHoverTooltip("Other players will NOT be able to see your profile."
+                                            + "\nHowever, if they have seen you before, they can find you by searching in the Local PC section.");
+
+                            ImGui.SameLine();
+
+                            using (ImRaii.Disabled(_bHideFullProfile))
+                            {
+                                if (ImGui.Checkbox("Hide Territory History" + $"##{index}", ref _bHideTerritoryInfo))
+                                {
+                                    _getLocalChara.Privacy.HideTerritoryInfo = _bHideTerritoryInfo;
+                                    if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);
+                                }
+                                Util.SetHoverTooltip("Other players will NOT be able to see your location history.");
+
+                                ImGui.SameLine();
+
+                                if (ImGui.Checkbox("Hide Customization History" + $"##{index}", ref _bHideCustomizations))
+                                {
+                                    _getLocalChara.Privacy.HideCustomizations = _bHideCustomizations;
+                                    if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);
+                                }
+                                Util.SetHoverTooltip("Other players will NOT be able to see your customization history.");
+
+                                if (ImGui.Checkbox("Dont Appear in Search Results" + $"##{index}", ref _bHideInSearchResults))
+                                {
+                                    _getLocalChara.Privacy.HideInSearchResults = _bHideInSearchResults;
+                                    if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);//  character.HideInSearchResults = !character.HideInSearchResults;
+                                }
+                                Util.SetHoverTooltip("Your name will NOT appear in search results.");
+
+                                ImGui.SameLine();
+
+                                if (ImGui.Checkbox("Hide Alt Characters" + $"##{index}", ref _bHideAltCharacters))
+                                {
+                                    _getLocalChara.Privacy.HideAltCharacters = _bHideAltCharacters;
+                                    if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);//  character.HideInSearchResults = !character.HideInSearchResults;
+                                }
+                                Util.SetHoverTooltip("None of your alt characters will be visible to other players in the detailed player window.");
+                            }
+                           
+                            ImGui.SameLine();
+
+                            if (ImGui.Checkbox("Hide Retainers" + $"##{index}", ref _bHideRetainersInfo))
+                            {
+                                _getLocalChara.Privacy.HideRetainersInfo = _bHideRetainersInfo;
+                                if (!EditedCharactersPrivacy.Contains(character.LocalContentId)) EditedCharactersPrivacy.Add(character.LocalContentId);//  character.HideInSearchResults = !character.HideInSearchResults;
+                            }
+                            Util.SetHoverTooltip("None of your retainers will be visible to other players and will NOT appear in search results.");
+                        }
+                        ImGuiHelpers.ScaledDummy(5.0f);
+                        ImGui.Separator();
+                        ImGuiHelpers.ScaledDummy(5.0f);
+                    }
+                    index++;
+                }
+            }
+
+            ImGui.EndGroup();
+
+            ImGui.NewLine();
+
+            using (ImRaii.Disabled(bIsNetworkProcessing))
+            {
+                using (ImRaii.Disabled(EditedCharactersPrivacy.Count == 0))
+                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Save, "Save Config"))
+                    {
+                        var updateCharacters = new List<UserCharacterDto?>();
+                        foreach (var chara in _LocalUserCharacters)
+                        {
+                            if (EditedCharactersPrivacy.Contains(chara.Key))
+                            {
+                                updateCharacters.Add(new UserCharacterDto { LocalContentId = chara.Key, Name = chara.Value.Name, Privacy = chara.Value.Privacy });
+                            }
+                        }
+                        _ = Task.Run(() =>
+                        {
+                            bIsNetworkProcessing = true;
+                            
+                            var response = _client.UserUpdate(new UserUpdateDto { Characters = updateCharacters }).ConfigureAwait(false).GetAwaiter().GetResult();
+                            LastNetworkMessage = response;
+                            bIsNetworkProcessing = false;
+                            RefreshUserProfileInfo();
+                        });
+
+                        EditedCharactersPrivacy.Clear();
+                    }
+                Util.SetHoverTooltip("Save your configuration to server");
+
+                ImGui.SameLine();
+
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Sync, "Refresh Profile Info"))
+                {
+                    RefreshUserProfileInfo();
+                }
+                Util.SetHoverTooltip("Request profile data from the server");
+
+                ImGui.SameLine();
+
+                if (!string.IsNullOrWhiteSpace(LastNetworkMessage))
+                {
+                    Util.ColoredErrorTextWrapped($"{LastNetworkMessage} ({LastNetworkMessageTime})");
+                }
+            }
+        }
+
+        private void RefreshUserProfileInfo()
+        {
+            _ = Task.Run(() =>
+            {
+                bIsNetworkProcessing = true;
+                var request = _client.UserRefreshMyInfo().ConfigureAwait(false).GetAwaiter().GetResult();
+                LastNetworkMessage = request.Message;
+                LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+                bIsNetworkProcessing = false;
+                if (request.User != null)
+                {
+                    LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
+                    SaveUserResultToConfig(request.User);
+                }
+            });
         }
 
         private CancellationTokenSource _cancellationToken;
@@ -732,26 +822,17 @@ namespace RetainerTrackExpanded.GUI
             _ = Task.Run(() =>
             {
                 PersistenceContext.Instance.HandleContentIdMappingAsync(playerMappings);
-                PersistenceContext.Instance.HandleMarketBoardPage(retainerMappings);
             });
 
-            MainWindow.ReloadMainWindowStats();
+            _ = Task.Run(() =>
+            {
+                PersistenceContext.Instance.HandleMarketBoardPage(retainerMappings);
+            });
 
             _playersFetchedFromServer.Clear(); _retainersFetchedFromServer.Clear();
             IsDbRefreshing = false;
 
-            _ = Task.Run(() =>
-            {
-                bIsNetworkProcessing = true;
-                var request = _client.UserRefreshMyInfo().ConfigureAwait(false).GetAwaiter().GetResult();
-                LastNetworkMessage = request.Message;
-                LastNetworkMessageTime = DateTime.Now.ToString("HH:mm:ss", CultureInfo.CurrentCulture);
-                bIsNetworkProcessing = false;
-                if (request.User != null)
-                {
-                    SaveUserResultToConfig(request.User);
-                }
-            });
+            RefreshUserProfileInfo();
         }
 
         public (ServerStatsDto ServerStats, string Message) CheckServerStats()
@@ -774,91 +855,7 @@ namespace RetainerTrackExpanded.GUI
         }
 
         int TablePlayerMaxLimit = 50;
-        private async void DrawMyFavoritesPage()
-        {
-            ServerStatusGui();
-
-            var players = Config.FavoritedPlayer;
-            if (players == null) return;
-            if (ImGui.BeginTable($"FavoritedPlayersTable", FavoritedPlayersColumn.Length, ImGuiTableFlags.BordersInner | ImGuiTableFlags.ScrollY))
-            {
-                foreach (var t in FavoritedPlayersColumn)
-                {
-                    ImGui.TableSetupColumn(t, ImGuiTableColumnFlags.WidthFixed);
-                }
-                ImGui.TableHeadersRow();
-                var index = 0;
-
-                foreach (var (localContentId, player) in players)
-                {
-                    if (index > TablePlayerMaxLimit)
-                        break;
-                    if (player == null)
-                        continue;
-                    ImGui.TableNextRow();
-                    ImGui.TableNextColumn(); 
-
-                    if (ImGui.Button("Load Details" + $"##{index}"))
-                    {
-                        DetailsWindow.Instance.IsOpen = true;
-                        DetailsWindow.Instance.OpenDetailedPlayerWindow((ulong)localContentId, true);
-                    }
-                    ImGui.SameLine();
-
-                    if (!string.IsNullOrWhiteSpace(player.Name)) // PlayerName column
-                    {
-                        if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
-                        {
-                            if (ImGui.Button("c" + $"##{index}"))
-                            {
-                                ImGui.SetClipboardText(player.Name);
-                            }
-                            ImGui.SameLine();
-                        }
-                        ImGui.Text(player.Name);
-                    }
-                    else
-                    {
-                        ImGui.Text("---");
-                    }
-
-                    ImGui.TableNextColumn();  //cId column
-
-                    if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
-                    {
-                        if (ImGui.Button("c" + $"###{index}"))
-                        {
-                            ImGui.SetClipboardText(localContentId.ToString());
-                        }
-                        ImGui.SameLine();
-                    }
-                    ImGui.Text(localContentId.ToString());
-
-                    ImGui.TableNextColumn(); //AccId column
-
-                    if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
-                    {
-                        if (ImGui.Button("c" + $"###{index}"))
-                        {
-                            ImGui.SetClipboardText(player.AccountId.ToString());
-                        }
-                        ImGui.SameLine();
-                    }
-                    ImGui.Text(player.AccountId.ToString());
-
-                    ImGui.TableNextColumn(); //Remove column
-
-                    if (ImGui.Button("X" + $"###{index}"))
-                    {
-                        Config.FavoritedPlayer.Remove(localContentId, out _);
-                    }
-
-                    index++;
-                }
-                ImGui.EndTable();
-            }
-        }
-
+        
         string? _serverIpAdressField = null;
         bool bShowServerIpAdressTextField;
         public void ServerStatusGui()
@@ -875,7 +872,7 @@ namespace RetainerTrackExpanded.GUI
 
                 ImGui.InputTextWithHint("", "Server Ip", ref _serverIpAdressField, 50, ImGuiInputTextFlags.CharsNoBlank);
                 ImGui.SameLine();
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Save, "Save"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Save, "Connect"))
                 {
                     try
                     {

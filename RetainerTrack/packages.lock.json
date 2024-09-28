@@ -2,12 +2,6 @@
   "version": 1,
   "dependencies": {
     "net8.0-windows7.0": {
-      "BCrypt.Net-Next": {
-        "type": "Direct",
-        "requested": "[4.0.3, )",
-        "resolved": "4.0.3",
-        "contentHash": "W+U9WvmZQgi5cX6FS5GDtDoPzUCV4LkBLkywq/kRZhuDwcbavOzcDAr3LXJFqHUi952Yj3LEYoWW0jbEUQChsA=="
-      },
       "Dalamud.Extensions.MicrosoftLogging": {
         "type": "Direct",
         "requested": "[4.0.1, )",

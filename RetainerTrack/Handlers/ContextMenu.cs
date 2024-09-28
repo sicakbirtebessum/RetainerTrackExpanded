@@ -71,8 +71,6 @@ public class ContextMenu
         if (!IsMenuValid(menuOpenedArgs))
             return;
 
-        PersistenceContext._logger.LogCritical(menuTargetDefault.TargetHomeWorld.Id.ToString() + " Cıd:" + menuTargetDefault.TargetContentId + " name:" + menuTargetDefault.TargetName);
-
         if (menuTargetDefault.TargetHomeWorld.Id < 10000)
         {
             if (menuTargetDefault.TargetContentId != 0)
@@ -167,7 +165,7 @@ public class ContextMenu
         var agentMuteList = Framework.Instance()->GetUIModule()->GetAgentModule()->GetAgentByInternalId(AgentId.Mutelist);
         if (agentMuteList != null)
         {
-            return MemoryHelper.ReadSeStringNullTerminated(*(nint*)((nint)agentMuteList + 0x68)).TextValue; // should create the agent in CS later
+            return MemoryHelper.ReadSeStringNullTerminated(*(nint*)((nint)agentMuteList + 0x58)).TextValue; // should create the agent in CS later
         }
 
         return string.Empty;

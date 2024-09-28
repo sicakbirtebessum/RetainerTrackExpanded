@@ -1,5 +1,7 @@
 ﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.ManagedFontAtlas;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Common.Lua;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
@@ -10,8 +12,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using static FFXIVClientStructs.FFXIV.Component.GUI.AtkFontManager;
 using static Lumina.Models.Materials.Texture;
 
 namespace RetainerTrackExpanded
@@ -148,7 +153,7 @@ namespace RetainerTrackExpanded
             ImGui.PopTextWrapPos();
         }
 
-        public static void ColoredTextWrapped(string s)
+        public static void ColoredErrorTextWrapped(string s)
         {
             if (!string.IsNullOrWhiteSpace(s))
             {
@@ -157,6 +162,15 @@ namespace RetainerTrackExpanded
                 if (s.StartsWith("Error:"))
                     textColor = ImGuiColors.DalamudRed;
 
+                Util.Text(textColor, s);
+                ImGui.PopTextWrapPos();
+            }
+        }
+        public static void ColoredTextWrapped(Vector4? textColor, string s)
+        {
+            if (!string.IsNullOrWhiteSpace(s))
+            {
+                ImGui.PushTextWrapPos(0);
                 Util.Text(textColor, s);
                 ImGui.PopTextWrapPos();
             }
@@ -225,6 +239,41 @@ namespace RetainerTrackExpanded
                 ImGui.TextUnformatted(tooltip);
                 ImGui.EndTooltip();
             }
+        }
+
+        public static string GenerateRandomKey(int length = 20)
+        {
+            char[] chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
+            byte[] array = new byte[length * 4];
+            using (RandomNumberGenerator randomNumberGenerator = RandomNumberGenerator.Create())
+            {
+                randomNumberGenerator.GetBytes(array);
+            }
+
+            StringBuilder stringBuilder = new StringBuilder(length);
+            for (int i = 0; i < length; i++)
+            {
+                long num = BitConverter.ToUInt32(array, i * 4) % chars.Length;
+                stringBuilder.Append(chars[num]);
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        public static string clientVer => Assembly.GetExecutingAssembly().GetName().Version!.ToString();
+
+        public static string Vector3ToString(Vector3 v)
+        {
+            return string.Format("{0:0.00}.{1:0.00}.{2:0.00}", v.X, v.Y, v.Z);
+        }
+
+        public static Vector3 Vector3FromString(String s)
+        {
+            string[] parts = s.Split(new string[] { "." }, StringSplitOptions.None);
+            return new Vector3(
+                float.Parse(parts[0]),
+                float.Parse(parts[1]),
+                float.Parse(parts[2]));
         }
     }
 }

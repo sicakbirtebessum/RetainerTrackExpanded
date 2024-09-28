@@ -1,15 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Memory;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using ImGuiNET;
+using Lumina.Excel.GeneratedSheets2;
+using Lumina.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using RetainerTrackExpanded.API.Models;
+using RetainerTrackExpanded.Database;
+using RetainerTrackExpanded.GUI;
+using RetainerTrackExpanded.Models;
 
 namespace RetainerTrackExpanded.Handlers;
 
@@ -37,7 +51,7 @@ internal sealed class ObjectTableHandler : IDisposable
     private unsafe void FrameworkUpdate(IFramework framework)
     {
         long now = Environment.TickCount64;
-        if (!_clientState.IsLoggedIn || now - _lastUpdate < 20_000) //_clientState.IsPvPExcludingDen
+        if (!_clientState.IsLoggedIn || now - _lastUpdate < 10_000) //_clientState.IsPvPExcludingDen
             return;
 
         _lastUpdate = now;
@@ -47,7 +61,7 @@ internal sealed class ObjectTableHandler : IDisposable
         {
             if (obj.ObjectKind == ObjectKind.Player)
             {
-                var bc = (BattleChara*)obj.Address;
+                var bc = (Character*)obj.Address;
                 if (bc->ContentId == 0 || bc->AccountId == 0)
                     continue;
 
@@ -58,29 +72,32 @@ internal sealed class ObjectTableHandler : IDisposable
                     PlayerName = bc->NameString,
                     WorldId = bc->HomeWorld,
                 });
-                //foreach(var im in bc->DrawData.CustomizeData.Data)
-                //{
-                //    PersistenceContext._logger.LogCritical("Data: " + im);
-                //}
-                //PersistenceContext._logger.LogCritical("Battlion: " + bc->Battalion);
-                //PersistenceContext._logger.LogCritical("Data: " + bc->DrawData.CustomizeData.Data.ToString());
-                //PersistenceContext._logger.LogCritical("Height: " + bc->DrawData.CustomizeData.Height.ToString());
-                //PersistenceContext._logger.LogCritical("BodyType: " + bc->DrawData.CustomizeData.BodyType.ToString());
-                //PersistenceContext._logger.LogCritical("BustSize: " + bc->DrawData.CustomizeData.BustSize.ToString());
-                //PersistenceContext._logger.LogCritical("Face: " + bc->DrawData.CustomizeData.Face.ToString());
-                //PersistenceContext._logger.LogCritical("FacePaintColor: " + bc->DrawData.CustomizeData.FacePaintColor.ToString());
-                //PersistenceContext._logger.LogCritical("SkinColor: " + bc->DrawData.CustomizeData.SkinColor.ToString());
-                //PersistenceContext._logger.LogCritical("Race: " + bc->DrawData.CustomizeData.Race.ToString()); 
-                //PersistenceContext._logger.LogCritical("Race: " + bc->DrawData.CustomizeData.Race.ToString());
-                //PersistenceContext._logger.LogCritical("Sex: " + bc->DrawData.CustomizeData.Sex.ToString());
+
+                var Customization = bc->DrawData.CustomizeData;
 
                 PersistenceContext.AddPlayerUploadData(bc->ContentId, new PostPlayerRequest
                 {
                     LocalContentId = bc->ContentId,
                     Name = bc->NameString,
                     AccountId = (int?)bc->AccountId,
-                    WorldId = bc->HomeWorld,
+                    HomeWorldId = bc->HomeWorld,
+                    CurrentWorldId = bc->CurrentWorld,
                     TerritoryId = (short)PersistenceContext._clientState.TerritoryType,
+                    PlayerPos = Util.Vector3ToString(obj.GetMapCoordinates()),
+                    Customization = new PlayerCustomization { BodyType = Customization.BodyType,
+                        BustSize = Customization.BustSize,
+                        EyeShape = Customization.EyeShape,
+                        Face = Customization.Face,
+                        Height = Customization.Height,
+                        Jaw = Customization.Jaw,
+                        Mouth = Customization.Mouth,
+                        MuscleMass = Customization.MuscleMass,
+                        Nose = Customization.Nose,
+                        SkinColor = Customization.SkinColor,
+                        SmallIris = Customization.SmallIris,
+                        TailShape = Customization.TailShape,
+                        GenderRace = ((byte)Models.RaceEnumExtensions.CombinedRace((Gender)bc->DrawData.CustomizeData.Sex, (SubRace)bc->DrawData.CustomizeData.Tribe))
+                    },
                     CreatedAt = Tools.UnixTime,
                 });
             }
@@ -91,7 +108,6 @@ internal sealed class ObjectTableHandler : IDisposable
 
         _logger.LogTrace("ObjectTable handling for {Count} players took {TimeMs}", playerMappings.Count, TimeSpan.FromMilliseconds(Environment.TickCount64 - now));
     }
-
     public void Dispose()
     {
         _framework.Update -= FrameworkUpdate;

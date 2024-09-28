@@ -9,6 +9,7 @@ using Dalamud.Memory;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using Microsoft.Extensions.Logging;
 using RetainerTrackExpanded.API.Models;
 using RetainerTrackExpanded.Database;
@@ -75,7 +76,8 @@ internal sealed unsafe class GameHooks : IDisposable
                         LocalContentId = contentId,
                         Name = mapping.PlayerName,
                         AccountId = (int?)mapping.AccountId,
-                        WorldId = null,
+                        HomeWorldId = null,
+                        CurrentWorldId = (ushort)PersistenceContext.GetCurrentWorld(),
                         CreatedAt = Tools.UnixTime,
                     });
                     Task.Run(() => _persistenceContext.HandleContentIdMappingAsync(new List<PlayerMapping> { mapping }));
@@ -106,13 +108,16 @@ internal sealed unsafe class GameHooks : IDisposable
                 if (player.ContentId == 0)
                     continue;
 
+                ushort? homeWorldId = player.HomeWorldID != 0 && player.HomeWorldID != 65535 ? player.HomeWorldID : null;
+
                 var mapping = new PlayerMapping
                 {
                     ContentId = player.ContentId,
                     AccountId = player.AccountId != 0 ? player.AccountId : null,
                     PlayerName = MemoryHelper.ReadString(new nint(player.CharacterName), Encoding.ASCII, 32),
+                    WorldId = homeWorldId,
                 };
-                
+
                 if (!string.IsNullOrEmpty(mapping.PlayerName))
                 {
                     mappings.Add(mapping);
@@ -121,11 +126,11 @@ internal sealed unsafe class GameHooks : IDisposable
                         LocalContentId = mapping.ContentId,
                         Name = mapping.PlayerName,
                         AccountId = (int?)mapping.AccountId,
-                        WorldId = mapping.WorldId,
+                        HomeWorldId = mapping.WorldId,
+                        CurrentWorldId = (ushort)PersistenceContext.GetCurrentWorld(),
                         CreatedAt = Tools.UnixTime,
                     });
-                    //_logger.LogDebug($"ProcessCharacterNameResult If CId:{mapping.ContentId} Name:{mapping.PlayerName} AId: {mapping.AccountId} WId:{mapping.WorldId}");
-                    //_logger.LogDebug("Content id {ContentId} belongs to '{Name}' ({AccountId})", mapping.ContentId, mapping.PlayerName, mapping.AccountId);
+                    _logger.LogError($"{mapping.ContentId} {mapping.PlayerName}");
                 }
                 else
                 {
@@ -185,9 +190,12 @@ internal sealed unsafe class GameHooks : IDisposable
         /// </summary>
         [FieldOffset(0x18)] public readonly ulong AccountId;
 
+        [FieldOffset(0x42)] public ushort HomeWorldID;
+
         /// <summary>
         /// This *can* be empty, e.g. if you're querying your friend list, the names are ONLY set for characters on the same world.
         /// </summary>
         [FieldOffset(0x44)] public fixed byte CharacterName[32];
+        [FieldOffset(0x64)] private fixed byte FcTagBytes[7];
     }
 }

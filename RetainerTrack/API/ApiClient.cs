@@ -10,12 +10,14 @@ using RetainerTrackExpanded.Handlers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RetainerTrackExpanded.API
 {
@@ -44,7 +46,7 @@ namespace RetainerTrackExpanded.API
             {
                 IsCheckingServerStatus = true;
 
-                var request = new RestRequest($"server").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"server").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 var response = await _restClient.ExecuteGetAsync(request).ConfigureAwait(false);
                 long pingValue = -1;
                 
@@ -85,7 +87,7 @@ namespace RetainerTrackExpanded.API
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"server/stats").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"server/stats").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 var response = await _restClient.ExecuteGetAsync(request).ConfigureAwait(false);
 
                 if (response.IsSuccessful)
@@ -123,7 +125,7 @@ namespace RetainerTrackExpanded.API
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"players").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"players").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 if (!string.IsNullOrWhiteSpace(query.Name))
                     request.AddQueryParameter("Name", query.Name, true);
                 if (!string.IsNullOrWhiteSpace(query.LocalContentId.ToString()))
@@ -164,7 +166,7 @@ namespace RetainerTrackExpanded.API
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"players/{id}").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"players/{id}").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 var response = await _restClient.ExecuteGetAsync(request).ConfigureAwait(false);
 
                 if (response.IsSuccessful)
@@ -193,7 +195,7 @@ namespace RetainerTrackExpanded.API
         {
             try
             {
-                var request = new RestRequest($"players").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"players").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 request.AddJsonBody(players);
                 var response = await _restClient.ExecutePostAsync(request).ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.OK)
@@ -213,7 +215,7 @@ namespace RetainerTrackExpanded.API
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"retainers").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"retainers").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer); ;
                 if (!string.IsNullOrWhiteSpace(query.Name))
                     request.AddQueryParameter("Name", query.Name, true);
                 if (!string.IsNullOrWhiteSpace(query.Cursor.ToString()))
@@ -249,7 +251,7 @@ namespace RetainerTrackExpanded.API
         {
             try
             {
-                var request = new RestRequest($"retainers").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"retainers").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 request.AddJsonBody(retainers);
                 var response = await _restClient.ExecutePostAsync(request).ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.OK)
@@ -265,12 +267,12 @@ namespace RetainerTrackExpanded.API
             }
         }
         //---Users---//
-        public async Task<(User? User, string Message)> UserRegister(UserRegister register)
+        public async Task<(User? User, string Message)> LoginTest(UserRegister register)
         {
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"users/register");
+                var request = new RestRequest($"users/register").AddHeader("V", Util.clientVer);
                 request.AddJsonBody(register);
                 var response = await _restClient.ExecutePostAsync(request).ConfigureAwait(false);
 
@@ -298,17 +300,44 @@ namespace RetainerTrackExpanded.API
                 return (null, Message);
             }
         }
-        public async Task<(User? User, string Message)> UserLogin(int AccountId, string Password)
+
+        public async Task<(User? User, string Message)> DiscordAuth(UserRegister register)
+        {
+            string Message = string.Empty;
+            try
+            {
+                string output = JsonConvert.SerializeObject(register);
+                byte[] bytes = Encoding.UTF8.GetBytes(output);
+                string data = System.Convert.ToBase64String(bytes);
+                string url = Config.BaseUrl.Replace("api/v1/", "Auth/DiscordAuth?") + data;
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true,
+                });
+                return (null, Message);
+            }
+            catch (Exception ex)
+            {
+                Message = $"Error: {ex.Message}";
+                return (null, Message);
+            }
+        }
+        public async Task<(User? User, string Message)> UserLogin(UserRegister loginUser)
         {
             string Message = string.Empty;
             try
             {
                 var request = new RestRequest($"users/login");
-                request.AddBody(new
-                {
-                    gameAccountId = AccountId.ToString(),
-                    password = Password
-                });
+                request.AddJsonBody(loginUser);
+                
+                //request.AddBody(new
+                //{
+                //    gameAccountId = loginUser.GameAccountId.ToString(),
+                //    clientId = loginUser.ClientId,
+                //    name = loginUser.Name,
+                //});
+
                 var response = await _restClient.ExecutePostAsync(request).ConfigureAwait(true);
 
                 if (response.IsSuccessful)
@@ -335,23 +364,18 @@ namespace RetainerTrackExpanded.API
                 return (null, Message);
             }
         }
-        public async Task<(User? User, string Message)> UserUpdate(UserUpdateDto config)
+        public async Task<string> UserUpdate(UserUpdateDto config)
         {
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"users/update").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"users/update").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 request.AddJsonBody(config);
                 var response = await _restClient.ExecutePostAsync(request).ConfigureAwait(true);
 
-                if (response.IsSuccessful)
+                if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
                 {
-                    var _JsonResponse = JsonConvert.DeserializeObject<User>(response.Content!);
-                    if (_JsonResponse != null)
-                    {
-                        Message = "Config saved.";
-                        return (_JsonResponse, Message);
-                    }
+                    return response.Content;
                 }
                 else if (!string.IsNullOrWhiteSpace(response.Content))
                     Message = $"Error: {response.Content}";
@@ -360,12 +384,12 @@ namespace RetainerTrackExpanded.API
                 else
                     Message = $"Error: {response.StatusCode.ToString()}";
 
-                return (null, Message);
+                return Message;
             }
             catch (Exception ex)
             {
                 Message = $"Error: {ex.Message}";
-                return (null, Message);
+                return Message;
             }
         }
         public string _RefreshMyInfoStatus = string.Empty;
@@ -374,7 +398,7 @@ namespace RetainerTrackExpanded.API
             string Message = string.Empty;
             try
             {
-                var request = new RestRequest($"users/me").AddHeader("api-key", $"{Token}");
+                var request = new RestRequest($"users/me").AddHeader("api-key", $"{Token}").AddHeader("V", Util.clientVer);
                 var response = await _restClient.ExecuteGetAsync(request).ConfigureAwait(true);
 
                 if (response.IsSuccessful)

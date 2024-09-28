@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using RetainerTrackExpanded.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -11,17 +12,23 @@ namespace RetainerTrackExpanded.API.Models
 {
     public class PostPlayerRequest
     {
-        [JsonPropertyName("L")]
+        [JsonPropertyName("1")]
         public ulong LocalContentId { get; set; }
-        [JsonPropertyName("N")] //MinLength(4,ErrorMessage = "Name must be at least 4 characters"), MaxLength(32),
+        [JsonPropertyName("2")]
         public string Name { get; set; } = string.Empty;
-        [JsonPropertyName("W")]
-        public ushort? WorldId { get; set; }
-        [JsonPropertyName("A")]
+        [JsonPropertyName("3")]
+        public ushort? HomeWorldId { get; set; }
+        [JsonPropertyName("4")]
         public int? AccountId { get; set; }
-        [JsonPropertyName("T")]
+        [JsonPropertyName("5")]
         public short? TerritoryId { get; set; }
-        [JsonPropertyName("C")]
+        [JsonPropertyName("6")]
+        public string? PlayerPos { get; set; }
+        [JsonPropertyName("7")]
+        public ushort? CurrentWorldId { get; set; }
+        [JsonPropertyName("8")]
+        public PlayerCustomization? Customization { get; set; }
+        [JsonPropertyName("9")]
         public int CreatedAt { get; set; }
     }
 }

@@ -21,6 +21,8 @@ using System.Threading.Tasks;
 using System.Collections;
 using Dalamud.Interface.Components;
 using Dalamud.Interface;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Xml.Linq;
 
 namespace RetainerTrackExpanded.GUI
 {
@@ -118,7 +120,13 @@ namespace RetainerTrackExpanded.GUI
                 if (ImGui.BeginTabItem("Search Players & Retainers"))
                 {
                     _CurrentTab = Tabs.SearchPlayersAndRetainers;
-                    DrawSearchPlayersAndRetainers_FromServerTabAsync();
+                    DrawSearchPlayersAndRetainers_FromServerTab();
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("My Favorites"))
+                {
+                    DrawMyFavoriesTab();
                     ImGui.EndTabItem();
                 }
 
@@ -154,7 +162,7 @@ namespace RetainerTrackExpanded.GUI
             _LastRetainerSearchResult = (RetainerResult.Retainers, RetainerResult.Message);
         }
 
-        public async System.Threading.Tasks.Task DrawSearchPlayersAndRetainers_FromServerTabAsync()
+        public async Task DrawSearchPlayersAndRetainers_FromServerTab()
         {
             if (lastSelectedPlayerOrRetainerValue != selectedComboItem_PlayerOrRetainer)
             {
@@ -298,13 +306,13 @@ namespace RetainerTrackExpanded.GUI
             if (!string.IsNullOrWhiteSpace(_LastPlayerSearchResult.Message))
             {
                 ImGui.SetNextItemWidth(100);
-                Util.ColoredTextWrapped(_LastPlayerSearchResult.Message);
+                Util.ColoredErrorTextWrapped(_LastPlayerSearchResult.Message);
             }
 
             if (!string.IsNullOrWhiteSpace(_LastRetainerSearchResult.Message))
             {
                 ImGui.SetNextItemWidth(100);
-                Util.ColoredTextWrapped(_LastRetainerSearchResult.Message);
+                Util.ColoredErrorTextWrapped(_LastRetainerSearchResult.Message);
             }
 
             ImGuiHelpers.ScaledDummy(5.0f);
@@ -597,9 +605,10 @@ namespace RetainerTrackExpanded.GUI
                 LastUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             }
 
-            if (!Config.IsLoggedIn || string.IsNullOrWhiteSpace(Config.Key))
+            if (!Config.LoggedIn || string.IsNullOrWhiteSpace(Config.Key))
             {
                 Util.ShowColoredMessage("Error: You are not connected.");
+                ImGui.SameLine();
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Lock, "Open Configuration Menu to connect to Server"))
                 {
                     ConfigWindow.Instance.IsOpen = true;
@@ -673,6 +682,93 @@ namespace RetainerTrackExpanded.GUI
             }
 
             ImGui.EndChild();
+        }
+
+        private readonly string[] FavoritedPlayersColumn = new string[]
+       {
+        "Current Name","Content Id","Account Id","Remove"
+       };
+        private async void DrawMyFavoriesTab()
+        {
+            var players = Config.FavoritedPlayer;
+            if (players == null) return;
+            if (ImGui.BeginTable($"FavoritedPlayersTable", FavoritedPlayersColumn.Length, ImGuiTableFlags.BordersInner | ImGuiTableFlags.ScrollY))
+            {
+                foreach (var t in FavoritedPlayersColumn)
+                {
+                    ImGui.TableSetupColumn(t, ImGuiTableColumnFlags.WidthFixed);
+                }
+                ImGui.TableHeadersRow();
+                var index = 0;
+
+                foreach (var (localContentId, player) in players)
+                {
+                    if (index > TablePlayerMaxLimit)
+                        break;
+                    if (player == null)
+                        continue;
+                    ImGui.TableNextRow();
+                    ImGui.TableNextColumn();
+
+                    if (ImGui.Button("Load Details" + $"##{index}"))
+                    {
+                        DetailsWindow.Instance.IsOpen = true;
+                        DetailsWindow.Instance.OpenDetailedPlayerWindow((ulong)localContentId, true);
+                    }
+                    ImGui.SameLine();
+
+                    if (!string.IsNullOrWhiteSpace(player.Name)) // PlayerName column
+                    {
+                        if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
+                        {
+                            if (ImGui.Button("c" + $"##{index}"))
+                            {
+                                ImGui.SetClipboardText(player.Name);
+                            }
+                            ImGui.SameLine();
+                        }
+                        ImGui.Text(player.Name);
+                    }
+                    else
+                    {
+                        ImGui.Text("---");
+                    }
+
+                    ImGui.TableNextColumn();  //cId column
+
+                    if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
+                    {
+                        if (ImGui.Button("c" + $"###{index}"))
+                        {
+                            ImGui.SetClipboardText(localContentId.ToString());
+                        }
+                        ImGui.SameLine();
+                    }
+                    ImGui.Text(localContentId.ToString());
+
+                    ImGui.TableNextColumn(); //AccId column
+
+                    if (ImGui.IsKeyDown(ImGuiKey.LeftCtrl))
+                    {
+                        if (ImGui.Button("c" + $"###{index}"))
+                        {
+                            ImGui.SetClipboardText(player.AccountId.ToString());
+                        }
+                        ImGui.SameLine();
+                    }
+                    ImGui.Text(player.AccountId.ToString());
+
+                    ImGui.TableNextColumn(); //Remove column
+
+                    if (ImGui.Button("X" + $"###{index}"))
+                    {
+                        Config.FavoritedPlayer.Remove(localContentId, out _);
+                    }
+
+                    index++;
+                }
+                ImGui.EndTable();
+            }
         }
 
         public static ConcurrentDictionary<ushort, List<ulong>> _TempGetServerRetainersCount = new ConcurrentDictionary<ushort, List<ulong>>();

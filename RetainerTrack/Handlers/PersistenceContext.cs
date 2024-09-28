@@ -58,7 +58,8 @@ internal sealed class PersistenceContext
         }
     }
 
-    public List<TerritoryType> _territories;
+    public List<TerritoryType> Territories;
+
     public PersistenceContext(ILogger<PersistenceContext> logger, IClientState clientState,
         IServiceProvider serviceProvider, IDataManager data)
     {
@@ -73,7 +74,7 @@ internal sealed class PersistenceContext
 
         ReloadCache();
 
-        _territories = RetainerTrackExpandedPlugin._dataManager.GetExcelSheet<TerritoryType>().ToList();
+        Territories = RetainerTrackExpandedPlugin._dataManager.GetExcelSheet<TerritoryType>().ToList();
 
         _ = PostPlayerAndRetainerData();
     }
@@ -166,7 +167,7 @@ internal sealed class PersistenceContext
         if (_GetUploadedCacheRetainer != null)
         {
             bool removed = false;
-            if (Tools.UnixTime - _GetUploadedCacheRetainer.CreatedAt > 300)
+            if (Tools.UnixTime - _GetUploadedCacheRetainer.CreatedAt > 215) //3.30minutes
             {
                 _UploadedRetainersCache.TryRemove(CId, out _);
                 removed = true;
@@ -213,7 +214,7 @@ internal sealed class PersistenceContext
         if (UploadedCachePlayer != null)
         {
             bool removed = false;
-            if (Tools.UnixTime - UploadedCachePlayer.CreatedAt > 300)
+            if (Tools.UnixTime - UploadedCachePlayer.CreatedAt > 215) //3.30minutes
             {
                 _UploadedRetainersCache.TryRemove(CId, out _);
                 removed = true;
@@ -223,7 +224,9 @@ internal sealed class PersistenceContext
                 bool changed = false;
                 if (request.Name != UploadedCachePlayer.Name) changed = true;
                 else if (request.AccountId != null && UploadedCachePlayer.AccountId == null) changed = true;
-                else if (request.WorldId != null && UploadedCachePlayer.WorldId == null) changed = true;
+                else if (request.TerritoryId != null && UploadedCachePlayer.TerritoryId == null) changed = true;
+                else if (request.HomeWorldId != null && UploadedCachePlayer.HomeWorldId == null) changed = true;
+                else if (request.CurrentWorldId != null && UploadedCachePlayer.CurrentWorldId == null) changed = true;
                 if (!changed)
                     return;
 
@@ -241,7 +244,9 @@ internal sealed class PersistenceContext
             bool changed = false;
             if (request.Name != UploadPlayer.Name) changed = true;
             else if (request.AccountId != null && UploadPlayer.AccountId == null) changed = true;
-            else if (request.WorldId != null && UploadPlayer.WorldId == null) changed = true;
+            else if (request.TerritoryId != null && UploadPlayer.TerritoryId == null) changed = true;
+            else if (request.HomeWorldId != null && UploadPlayer.HomeWorldId == null) changed = true;
+            else if (request.CurrentWorldId != null && UploadPlayer.CurrentWorldId == null) changed = true;
             if (!changed)
                 return;
 
@@ -269,7 +274,10 @@ internal sealed class PersistenceContext
                         Name = p.Value.Name,
                         LocalContentId = p.Key,
                         AccountId = p.Value.AccountId,
-                        WorldId = p.Value.WorldId,
+                        HomeWorldId = p.Value.HomeWorldId,
+                        CurrentWorldId = p.Value.CurrentWorldId,
+                        Customization = p.Value.Customization,
+                        PlayerPos = p.Value.PlayerPos,
                         TerritoryId = p.Value.TerritoryId,
                         CreatedAt = p.Value.CreatedAt,
                     }).ToList();
@@ -310,6 +318,14 @@ internal sealed class PersistenceContext
         {
             _logger.LogWarning("Could not post " + e.Message);
         }
+    }
+
+    public static uint? GetCurrentWorld()
+    {
+        uint currentWorld = _clientState.LocalPlayer?.CurrentWorld.Id ?? 0;
+        if (currentWorld == 0)
+            return null;
+        return currentWorld;
     }
 
     public static string GetCharacterNameOnCurrentWorld(string retainerName)
