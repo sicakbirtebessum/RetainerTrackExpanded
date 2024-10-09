@@ -575,79 +575,6 @@ namespace RetainerTrackExpanded.GUI
             {
                 if (ImGui.CollapsingHeader($"Show Retainers ({AllRetainers.Count})"))
                 {
-                    ImGui.BeginGroup();
-
-                    if (ImGui.BeginTable($"_Retainers", DetailedPlayerRetainerTableColumn.Length, ImGuiTableFlags.BordersInner))
-                    {
-                        foreach (var t in DetailedPlayerRetainerTableColumn)
-                        {
-                            ImGui.TableSetupColumn(t, ImGuiTableColumnFlags.WidthFixed);
-                        }
-                        ImGui.TableHeadersRow();
-                        var index = 0;
-
-                        foreach (var retainer in AllRetainers)
-                        {
-                            ImGui.TableNextRow();
-                            ImGui.TableNextColumn();
-
-                            if (retainer.Names.Count > 1 || retainer.Worlds.Count > 1)
-                            {
-                                if (ImGui.Button("Info->" + $"##{index}"))
-                                {
-                                    _seeExtraDetailsOfRetainer = retainer;
-                                }
-                                ImGui.SameLine();
-                            }
-
-                            ImGui.Text(retainer.Names.LastOrDefault().Name); // Name
-
-                            ImGui.TableNextColumn();
-
-                            ImGui.Text(Util.GetWorld((uint)retainer.Worlds.LastOrDefault().WorldId).Name.ToString()); // World
-
-                            ImGui.TableNextColumn();
-
-                            if (retainer.LastSeen != 0)
-                            {
-                                var LastSeenDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.LastSeen)} ({Tools.ToTimeSinceString((int)retainer.LastSeen)})" : Tools.ToTimeSinceString((int)retainer.LastSeen);
-                                ImGui.Text(LastSeenDate); //Last Seen column
-                            }
-                            else
-                            {
-                                var LastSeenDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.Names.FirstOrDefault().CreatedAt)} ({Tools.ToTimeSinceString((int)retainer.Names.FirstOrDefault().CreatedAt)})" : Tools.ToTimeSinceString((int)retainer.Names.FirstOrDefault().CreatedAt);
-                                ImGui.Text(LastSeenDate); //Last Seen column
-                            }
-
-                            ImGui.TableNextColumn();
-
-                            var AddedAtDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.Names.First().CreatedAt)} ({Tools.ToTimeSinceString((int)retainer.Names.First().CreatedAt)})" : Tools.ToTimeSinceString((int)retainer.Names.First().CreatedAt);
-                            ImGui.Text(AddedAtDate); //Added At column
-
-                            ImGui.TableNextColumn();
-
-                            var _GetAltCharAsOwner = _LastPlayerDetailedInfo.Player.PlayerAltCharacters.FirstOrDefault(a => a.LocalContentId == retainer.OwnerLocalContentId);
-                            string? RetainerOwnerName = _GetAltCharAsOwner != null ? _GetAltCharAsOwner.Name : _LastPlayerDetailedInfo.Player.PlayerNameHistories.LastOrDefault()?.Name;
-
-                            if (!string.IsNullOrWhiteSpace(RetainerOwnerName))
-                            {
-                                ImGui.Text(RetainerOwnerName); // OwnerName
-                            }
-                            else
-                            {
-                                ImGui.Text("---");
-                            }
-
-                            ImGui.TableNextColumn();
-
-                            ImGui.Text(retainer.LocalContentId.ToString()); // CId
-
-                            index++;
-                        }
-                    }
-                    ImGui.EndTable();
-                    ImGui.EndGroup();
-
                     if (_seeExtraDetailsOfRetainer != null)
                     {
                         if (_seeExtraDetailsOfRetainer.Names.Count > 0)
@@ -720,6 +647,79 @@ namespace RetainerTrackExpanded.GUI
                             ImGui.EndGroup();
                         }
                     }
+
+                    ImGui.BeginGroup();
+
+                    if (ImGui.BeginTable($"_Retainers", DetailedPlayerRetainerTableColumn.Length, ImGuiTableFlags.BordersInner | ImGuiTableFlags.ScrollY))
+                    {
+                        foreach (var t in DetailedPlayerRetainerTableColumn)
+                        {
+                            ImGui.TableSetupColumn(t, ImGuiTableColumnFlags.WidthFixed);
+                        }
+                        ImGui.TableHeadersRow();
+                        var index = 0;
+
+                        foreach (var retainer in AllRetainers)
+                        {
+                            ImGui.TableNextRow();
+                            ImGui.TableNextColumn();
+
+                            if (retainer.Names.Count > 1 || retainer.Worlds.Count > 1)
+                            {
+                                if (ImGui.Button("Info->" + $"##{index}"))
+                                {
+                                    _seeExtraDetailsOfRetainer = retainer;
+                                }
+                                ImGui.SameLine();
+                            }
+
+                            ImGui.Text(retainer.Names.LastOrDefault().Name); // Name
+
+                            ImGui.TableNextColumn();
+
+                            ImGui.Text(Util.GetWorld((uint)retainer.Worlds.LastOrDefault().WorldId).Name.ToString()); // World
+
+                            ImGui.TableNextColumn();
+
+                            if (retainer.LastSeen != 0)
+                            {
+                                var LastSeenDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.LastSeen)} ({Tools.ToTimeSinceString((int)retainer.LastSeen)})" : Tools.ToTimeSinceString((int)retainer.LastSeen);
+                                ImGui.Text(LastSeenDate); //Last Seen column
+                            }
+                            else
+                            {
+                                var LastSeenDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.Names.FirstOrDefault().CreatedAt)} ({Tools.ToTimeSinceString((int)retainer.Names.FirstOrDefault().CreatedAt)})" : Tools.ToTimeSinceString((int)retainer.Names.FirstOrDefault().CreatedAt);
+                                ImGui.Text(LastSeenDate); //Last Seen column
+                            }
+
+                            ImGui.TableNextColumn();
+
+                            var AddedAtDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(retainer.Names.First().CreatedAt)} ({Tools.ToTimeSinceString((int)retainer.Names.First().CreatedAt)})" : Tools.ToTimeSinceString((int)retainer.Names.First().CreatedAt);
+                            ImGui.Text(AddedAtDate); //Added At column
+
+                            ImGui.TableNextColumn();
+
+                            var _GetAltCharAsOwner = _LastPlayerDetailedInfo.Player.PlayerAltCharacters.FirstOrDefault(a => a.LocalContentId == retainer.OwnerLocalContentId);
+                            string? RetainerOwnerName = _GetAltCharAsOwner != null ? _GetAltCharAsOwner.Name : _LastPlayerDetailedInfo.Player.PlayerNameHistories.LastOrDefault()?.Name;
+
+                            if (!string.IsNullOrWhiteSpace(RetainerOwnerName))
+                            {
+                                ImGui.Text(RetainerOwnerName); // OwnerName
+                            }
+                            else
+                            {
+                                ImGui.Text("---");
+                            }
+
+                            ImGui.TableNextColumn();
+
+                            ImGui.Text(retainer.LocalContentId.ToString()); // CId
+
+                            index++;
+                        }
+                    }
+                    ImGui.EndTable();
+                    ImGui.EndGroup();
                 }
 
             }
@@ -755,30 +755,34 @@ namespace RetainerTrackExpanded.GUI
                         ImGui.TableNextRow();
                         ImGui.TableNextColumn();
 
-                        if (ImGui.Button("Map" + $"##{index}"))
-                        {
-                            var playerPos = Util.Vector3FromString(territory.PlayerPos);
-                            var _territory = PersistenceContext.Instance.Territories.First(row => row.RowId == _LastPlayerDetailedInfo.Player.PlayerLastSeenInfo.TerritoryHistory[index].TerritoryId);
-                            var mapLink = new MapLinkPayload(
-                                _territory.RowId,
-                                _territory.Map.Value.RowId,
-                                playerPos.X,
-                                playerPos.Y
-                            );
-                            _logger.LogCritical(playerPos.ToString());
-                            _logger.LogCritical($"{playerPos.X} Y: {playerPos.Y}");
-                            RetainerTrackExpandedPlugin._gameGui.OpenMapWithMapLink(mapLink);
-                        }
-                        ImGui.SameLine();
-
                         var getTerritory = PersistenceContext.Instance.Territories.Where(a => a.RowId == territory.TerritoryId).FirstOrDefault();
                         if (getTerritory != null)
                         {
+                            if (ImGui.Button("Map" + $"##{index}"))
+                            {
+                                var playerPos = Util.Vector3FromString(territory.PlayerPos);
+                                var _territory = PersistenceContext.Instance.Territories.First(row => row.RowId == _LastPlayerDetailedInfo.Player.PlayerLastSeenInfo.TerritoryHistory[index].TerritoryId);
+                                var mapLink = new MapLinkPayload(
+                                    _territory.RowId,
+                                    _territory.Map.Value.RowId,
+                                    playerPos.X,
+                                    playerPos.Y
+                                );
+                                _logger.LogCritical(playerPos.ToString());
+                                _logger.LogCritical($"{playerPos.X} Y: {playerPos.Y}");
+                                RetainerTrackExpandedPlugin._gameGui.OpenMapWithMapLink(mapLink);
+                            }
+                            ImGui.SameLine();
+
                             Util.DrawHelp(false, $"{getTerritory.PlaceName.Value.Name.ToString()} | {getTerritory.PlaceNameRegion.Value.Name.ToString()}");
                             ImGui.Text(getTerritory.PlaceName.Value.Name.ToString());
                         }
                         else
-                            ImGui.Text("TerritoryId: " + territory.TerritoryId);
+                        {
+                            Util.DrawHelp(false, $"Player's map could not be detected. Most likely, they were added from lists like player search or friend list.");
+                            ImGui.Text(" - ");
+                        }
+                            
 
                         ImGui.TableNextColumn();
 
@@ -858,13 +862,13 @@ namespace RetainerTrackExpanded.GUI
 
                     ImGui.TableNextColumn();
 
-                    ImGui.Text(customization.Height.ToString() + "%"); //Height
+                    ImGui.Text($"{customization.Height.ToString()}%"); //Height
 
                     ImGui.TableNextColumn();
 
 
                     if (Race.SplitRace().Gender == Gender.Male)
-                        ImGui.Text(customization.MuscleMass.ToString() + "%"); //MuscleMass
+                        ImGui.Text($"{customization.MuscleMass.ToString()}%");//MuscleMass
                     else
                         ImGui.Text("---");
 
@@ -873,12 +877,12 @@ namespace RetainerTrackExpanded.GUI
                     if (Race.SplitRace().Gender == Gender.Male)
                         ImGui.Text("---"); //BustSize
                     else
-                        ImGui.Text(customization.BustSize.ToString() + "%");
+                        ImGui.Text($"{customization.BustSize.ToString()}%");
 
                     ImGui.TableNextColumn();
 
-                    var lastSeenString = $"{Tools.UnixTimeConverter(customization.CreatedAt)} ({Tools.ToTimeSinceString((int)customization.CreatedAt)})";
-                    ImGui.Text(lastSeenString); //Last Seen column
+                    var LastSeenDate = Config.bShowDetailedDate ? $"{Tools.UnixTimeConverter(customization.CreatedAt)} ({Tools.ToTimeSinceString((int)customization.CreatedAt)})" : Tools.ToTimeSinceString((int)customization.CreatedAt);
+                    ImGui.Text(LastSeenDate); //Added At column
                 }
 
                 index++;

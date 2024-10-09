@@ -281,9 +281,11 @@ namespace RetainerTrackExpanded.GUI
                     ImGui.SameLine();
                     ImGui.TextColored(ImGuiColors.TankBlue, Config.FetchedPlayerInfoCount.ToString());
 
-                    Util.DrawHelp(true, "The total number of player and retainer search count.");
+                    Util.DrawHelp(false, "The total number of player and retainer search count.");
+
+                    ImGui.Text("Total number of searched Player & Retainer names:");
                     ImGui.SameLine();
-                    ImGui.TextColored(ImGuiColors.TankBlue, $"({Config.SearchedNamesCount.ToString()})");
+                    ImGui.TextColored(ImGuiColors.TankBlue, Config.SearchedNamesCount.ToString());
                 }
 
                 ImGui.NewLine();
@@ -296,6 +298,7 @@ namespace RetainerTrackExpanded.GUI
 
                 if (!string.IsNullOrWhiteSpace(LastNetworkMessage))
                 {
+                    ImGui.SameLine();
                     Util.ColoredErrorTextWrapped($"{LastNetworkMessage} ({LastNetworkMessageTime})");
                 }
             }

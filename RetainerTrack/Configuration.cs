@@ -21,15 +21,15 @@ namespace RetainerTrackExpanded
         public long ContentId { get; set; }
         public int AccountId { get; set; }
         public string Key { get; set; } = string.Empty;
-        public bool LoggedIn { get; set; }
+        public bool LoggedIn { get; set; } = false;
         public bool FreshInstall { get; set; } = true;
-        public int AppRoleId { get; set; }
-        public int? UploadedPlayersCount { get; set; }
-        public int? UploadedPlayerInfoCount { get; set; }
-        public int? UploadedRetainersCount { get; set; }
-        public int? UploadedRetainerInfoCount { get; set; }
-        public int? FetchedPlayerInfoCount { get; set; }
-        public int? SearchedNamesCount { get; set; }
+        public int AppRoleId { get; set; } = 0;
+        public int? UploadedPlayersCount { get; set; } = 0;
+        public int? UploadedPlayerInfoCount { get; set; } = 0;
+        public int? UploadedRetainersCount { get; set; } = 0;
+        public int? UploadedRetainerInfoCount { get; set; } = 0;
+        public int? FetchedPlayerInfoCount { get; set; } = 0;
+        public int? SearchedNamesCount { get; set; } = 0;
         public int? LastSyncedTime { get; set; }
         public ConcurrentDictionary<long, CachedFavoritedPlayer> FavoritedPlayer = new();
         public bool bShowDetailedDate { get; set; } = false;
